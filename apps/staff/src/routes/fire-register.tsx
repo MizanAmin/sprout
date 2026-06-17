@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
 import {
   useFireDrills,
@@ -8,9 +8,38 @@ import {
   type FireDrill,
   type FireDrillInput,
 } from '../features/fire-register/useFireRegister';
-import { Modal, Spinner, EmptyState, Badge, Field } from '../components/ui';
+import { Modal, Spinner, EmptyState, Badge, Field, StatCard } from '../components/ui';
 
 export const Route = createFileRoute('/fire-register')({ component: FireRegisterPage });
+
+// Parse an "mm:ss" (or plain seconds) evacuation time into total seconds.
+function evacToSeconds(value: string | null): number | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (trimmed.includes(':')) {
+    const [m, s] = trimmed.split(':');
+    const mins = Number(m);
+    const secs = Number(s);
+    if (Number.isNaN(mins) || Number.isNaN(secs)) return null;
+    return mins * 60 + secs;
+  }
+  const n = Number(trimmed);
+  return Number.isNaN(n) ? null : n;
+}
+
+function formatSeconds(total: number): string {
+  const mins = Math.floor(total / 60);
+  const secs = Math.round(total % 60);
+  return `${mins}:${String(secs).padStart(2, '0')}`;
+}
+
+// Format an ISO date (yyyy-mm-dd) into a short readable label.
+function formatDate(date: string): string {
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return date;
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
 
 function FireRegisterPage() {
   const { data: drills, isLoading } = useFireDrills();
@@ -19,6 +48,38 @@ function FireRegisterPage() {
 
   const [editing, setEditing] = useState<FireDrill | null>(null);
   const [open, setOpen] = useState(false);
+
+  const all = drills ?? [];
+
+  // Stats summary (mirrors the reference fire-drill summary: total drills,
+  // last drill date, average evacuation time, drills this term/year).
+  const stats = useMemo(() => {
+    const total = all.length;
+
+    // Latest drill by date.
+    const sorted = [...all].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+    const lastDate = sorted[0]?.date ?? null;
+
+    // Average evacuation time across drills that recorded one.
+    const evacSeconds = all
+      .map((d) => evacToSeconds(d.evacuation_time))
+      .filter((n): n is number => n != null);
+    const avgEvac =
+      evacSeconds.length > 0
+        ? formatSeconds(evacSeconds.reduce((sum, n) => sum + n, 0) / evacSeconds.length)
+        : '—';
+
+    // Drills in the current calendar year.
+    const year = new Date().getFullYear();
+    const thisYear = all.filter((d) => new Date(d.date).getFullYear() === year).length;
+
+    return {
+      total,
+      lastDate: lastDate ? formatDate(lastDate) : '—',
+      avgEvac,
+      thisYear,
+    };
+  }, [all]);
 
   const openAdd = () => {
     setEditing(null);
@@ -38,30 +99,38 @@ function FireRegisterPage() {
         </button>
       </div>
 
+      {/* Stat cards (mirrors the reference drill summary). */}
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <StatCard label="Total drills" value={stats.total} />
+        <StatCard label="Last drill" value={stats.lastDate} />
+        <StatCard label="Avg evacuation" value={stats.avgEvac} hint="mm:ss" />
+        <StatCard label="This year" value={stats.thisYear} />
+      </div>
+
       {isLoading ? (
         <Spinner />
-      ) : (drills ?? []).length === 0 ? (
+      ) : all.length === 0 ? (
         <EmptyState title="No fire drills recorded" description="Record a drill to start the register." />
       ) : (
         <div className="overflow-x-auto rounded-xl border border-border bg-surface">
           <table className="w-full text-sm">
             <thead className="text-left text-muted">
               <tr className="border-b border-border">
-                <th className="px-4 py-3 font-medium">Date</th>
+                <th className="px-4 py-3 font-medium">Date / Time</th>
                 <th className="px-4 py-3 font-medium">Type</th>
                 <th className="px-4 py-3 font-medium">Evacuation</th>
                 <th className="px-4 py-3 font-medium">Present</th>
                 <th className="px-4 py-3 font-medium">Outcome</th>
-                <th className="px-4 py-3 font-medium">By</th>
+                <th className="px-4 py-3 font-medium">Conducted by</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody>
-              {(drills ?? []).map((d) => (
+              {all.map((d) => (
                 <tr key={d.id} className="border-b border-border last:border-0">
                   <td className="px-4 py-3 text-gray-900">
-                    {d.date}
-                    {d.time ? ` ${d.time}` : ''}
+                    <div className="font-medium">{formatDate(d.date)}</div>
+                    {d.time && <div className="text-xs text-muted">{d.time}</div>}
                   </td>
                   <td className="px-4 py-3 capitalize">{d.drill_type}</td>
                   <td className="px-4 py-3">{d.evacuation_time || '—'}</td>
@@ -80,7 +149,7 @@ function FireRegisterPage() {
                       <button
                         className="text-sm text-danger"
                         onClick={() => {
-                          if (confirm(`Delete the drill on ${d.date}?`)) deleteDrill.mutate(d.id);
+                          if (confirm(`Delete the drill on ${formatDate(d.date)}?`)) deleteDrill.mutate(d.id);
                         }}
                       >
                         Delete
@@ -146,6 +215,7 @@ function DrillForm({
   const [personsPresent, setPersonsPresent] = useState(
     initial?.persons_present != null ? String(initial.persons_present) : '',
   );
+  const [conductedBy, setConductedBy] = useState(initial?.conducted_by ?? '');
   const [allClear, setAllClear] = useState(initial?.all_clear ?? true);
   const [issues, setIssues] = useState(initial?.issues ?? '');
   const [notes, setNotes] = useState(initial?.notes ?? '');
@@ -158,6 +228,7 @@ function DrillForm({
       drillType,
       evacuationTime: evacuationTime || undefined,
       personsPresent: personsPresent ? Number(personsPresent) : undefined,
+      conductedBy: conductedBy || undefined,
       allClear,
       issues: issues || undefined,
       notes: notes || undefined,
@@ -200,11 +271,19 @@ function DrillForm({
             onChange={(e) => setPersonsPresent(e.target.value)}
           />
         </Field>
-        <label className="mt-6 flex items-center gap-2 text-sm text-gray-700">
-          <input type="checkbox" checked={allClear} onChange={(e) => setAllClear(e.target.checked)} />
-          All clear
-        </label>
+        <Field label="Conducted by">
+          <input
+            className="input w-full"
+            value={conductedBy}
+            onChange={(e) => setConductedBy(e.target.value)}
+            placeholder="Staff member"
+          />
+        </Field>
       </div>
+      <label className="flex items-center gap-2 text-sm text-gray-700">
+        <input type="checkbox" checked={allClear} onChange={(e) => setAllClear(e.target.checked)} />
+        All clear
+      </label>
       {!allClear && (
         <Field label="Issues noted">
           <textarea className="input w-full" rows={2} value={issues} onChange={(e) => setIssues(e.target.value)} />

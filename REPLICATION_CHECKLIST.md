@@ -13,7 +13,7 @@ Reference source: `…/Nursery management/backend/backend/public/app.html` (sing
 - [x] `.card`, `.stat-card`, pill `.badge` (+ success/warning/danger/info/muted variants)
 - [x] Dark **slate sidebar** with **indigo active accent** (`text-indigo-300`)
 
-## ⏳ Phase 2 — Per-page appearance + feature match
+## ✅ Phase 2 — Per-page appearance + feature match (DONE — 38/38)
 All routes already exist (built earlier); each needs exact look/feature parity with the reference.
 Legend: ✅ matches · 🟡 exists, needs re-skin/feature pass · ⬜ not started
 
@@ -33,7 +33,7 @@ Legend: ✅ matches · 🟡 exists, needs re-skin/feature pass · ⬜ not starte
 | 12 | Planning | `/planning` | ✅ |
 | 13 | Monitoring | `/monitoring` | ✅ |
 | 14 | Live Register | `/register` | ✅ |
-| 15 | Fire Register | `/fire-register` | 🟡 |
+| 15 | Fire Register | `/fire-register` | ✅ |
 | 16 | Calendar | `/calendar` | ✅ |
 | 17 | Assessment | `/assessment` | ✅ |
 | 18 | Daily Logs | `/daily-logs` | ✅ |
