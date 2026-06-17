@@ -1,8 +1,9 @@
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { invoiceCreateSchema, type InvoiceCreateInput } from '@sprout/schemas';
+import { invoiceCreateSchema, type InvoiceCreateInput, type LineItem } from '@sprout/schemas';
 import { Field, Modal, gbp } from '../../components/ui';
 import { useChildren } from '../children/useChildren';
+import type { Invoice, InvoiceUpdateInput } from './useInvoices';
 
 // Empty string → undefined so optional numeric fields don't become NaN.
 const numberOpt = { setValueAs: (v: unknown) => (v === '' || v == null ? undefined : Number(v)) };
@@ -11,13 +12,18 @@ export function InvoiceModal({
   open,
   onClose,
   onSubmit,
+  onUpdate,
+  editing,
   submitting,
 }: {
   open: boolean;
   onClose: () => void;
   onSubmit: (data: InvoiceCreateInput) => void;
+  onUpdate?: (data: InvoiceUpdateInput) => void;
+  editing?: Invoice | null;
   submitting?: boolean;
 }) {
+  const isEdit = !!editing;
   const { data: children } = useChildren();
   const {
     register,
@@ -29,7 +35,19 @@ export function InvoiceModal({
     formState: { errors },
   } = useForm<InvoiceCreateInput>({
     resolver: zodResolver(invoiceCreateSchema),
-    defaultValues: { period: '', lineItems: [{ description: '', amount: 0 }] },
+    // Re-key the form per invoice so defaults reset between add/edit. See `key` in parent.
+    defaultValues: editing
+      ? {
+          childId: editing.child_id ?? undefined,
+          period: editing.period,
+          lineItems:
+            editing.line_items?.length > 0
+              ? (editing.line_items as LineItem[])
+              : [{ description: '', amount: 0 }],
+          dueDate: editing.due_date ?? undefined,
+          notes: editing.notes || undefined,
+        }
+      : { period: '', lineItems: [{ description: '', amount: 0 }] },
   });
   const { fields, append, remove } = useFieldArray({ control, name: 'lineItems' });
 
@@ -44,12 +62,26 @@ export function InvoiceModal({
   const lineItems = watch('lineItems');
   const total = (lineItems ?? []).reduce((s, l) => s + (Number(l?.amount) || 0), 0);
 
+  // Edit only touches the API-mutable fields; create sends the full payload.
+  const submit = handleSubmit((data) => {
+    if (isEdit && onUpdate) {
+      onUpdate({ dueDate: data.dueDate, notes: data.notes, lineItems: data.lineItems });
+    } else {
+      onSubmit(data);
+    }
+  });
+
   return (
-    <Modal open={open} onClose={onClose} title="New invoice">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <Modal open={open} onClose={onClose} title={isEdit ? `Edit ${editing!.invoice_ref}` : 'New invoice'}>
+      <form onSubmit={submit} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <Field label="Child" error={errors.childId?.message}>
-            <select {...register('childId', { valueAsNumber: true })} className="input" defaultValue="">
+            <select
+              {...register('childId', { valueAsNumber: true })}
+              className="input"
+              defaultValue={editing?.child_id ?? ''}
+              disabled={isEdit}
+            >
               <option value="" disabled>
                 Select…
               </option>
@@ -61,7 +93,7 @@ export function InvoiceModal({
             </select>
           </Field>
           <Field label="Period" error={errors.period?.message}>
-            <input {...register('period')} placeholder="2026-06" className="input" />
+            <input {...register('period')} placeholder="2026-06" className="input" readOnly={isEdit} />
           </Field>
         </div>
 
@@ -132,7 +164,13 @@ export function InvoiceModal({
 
         <div className="flex justify-end">
           <button type="submit" className="btn-primary" disabled={submitting}>
-            {submitting ? 'Creating…' : 'Create invoice'}
+            {submitting
+              ? isEdit
+                ? 'Saving…'
+                : 'Creating…'
+              : isEdit
+                ? 'Save changes'
+                : 'Create invoice'}
           </button>
         </div>
       </form>

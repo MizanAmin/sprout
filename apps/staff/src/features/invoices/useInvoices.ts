@@ -54,6 +54,21 @@ export function useCreateInvoice() {
   });
 }
 
+export interface InvoiceUpdateInput {
+  status?: InvoiceStatus;
+  dueDate?: string;
+  notes?: string;
+  lineItems?: LineItem[];
+}
+
+export function useUpdateInvoice(id: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: InvoiceUpdateInput) => api.patch<Invoice>(`/invoices/${id}`, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: invoiceKeys.all }),
+  });
+}
+
 export function useMarkInvoicePaid() {
   const qc = useQueryClient();
   return useMutation({

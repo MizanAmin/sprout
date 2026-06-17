@@ -22,12 +22,12 @@ Legend: ✅ matches · 🟡 exists, needs re-skin/feature pass · ⬜ not starte
 | 1 | Dashboard | `/dashboard` | ✅ |
 | 2 | Children | `/children` | ✅ |
 | 3 | Relatives | `/relatives` | 🟡 |
-| 4 | Staff | `/staff` | 🟡 |
+| 4 | Staff | `/staff` | ✅ |
 | 5 | Enquiries | `/enquiries` | 🟡 |
 | 6 | Waiting List | `/waiting-list` | 🟡 |
 | 7 | Consent Forms | `/consents` | 🟡 |
-| 8 | Messages | `/messages` | 🟡 |
-| 9 | Rooms | `/rooms` | 🟡 |
+| 8 | Messages | `/messages` | ✅ |
+| 9 | Rooms | `/rooms` | ✅ |
 | 10 | Staff Rota | `/rota` | 🟡 |
 | 11 | Sessions & Funding | `/sessions` | 🟡 |
 | 12 | Planning | `/planning` | 🟡 |
@@ -37,7 +37,7 @@ Legend: ✅ matches · 🟡 exists, needs re-skin/feature pass · ⬜ not starte
 | 16 | Calendar | `/calendar` | 🟡 |
 | 17 | Assessment | `/assessment` | 🟡 |
 | 18 | Daily Logs | `/daily-logs` | ✅ |
-| 19 | Learning Journal | `/journal` | 🟡 |
+| 19 | Learning Journal | `/journal` | ✅ |
 | 20 | Reflections | `/reflections` | 🟡 |
 | 21 | SEND | `/send` | 🟡 |
 | 22 | Newsfeed | `/newsfeed` | 🟡 |
@@ -48,7 +48,7 @@ Legend: ✅ matches · 🟡 exists, needs re-skin/feature pass · ⬜ not starte
 | 27 | Compliance Hub | `/compliance` | 🟡 |
 | 28 | GDPR | `/gdpr` | 🟡 |
 | 29 | Staff Development | `/staff-dev` | 🟡 |
-| 30 | Invoices | `/invoices` | 🟡 |
+| 30 | Invoices | `/invoices` | ✅ |
 | 31 | Finance | `/finance` | ✅ |
 | 32 | Revenue Report | `/revenue-report` | 🟡 |
 | 33 | Funded Hours Report | `/funded-hours` | 🟡 |

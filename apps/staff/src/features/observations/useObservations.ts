@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { ObservationCreateInput } from '@sprout/schemas';
+import type { ObservationCreateInput, ObservationUpdateInput } from '@sprout/schemas';
 import { api } from '../../api';
 
 // Observation row as returned by the API (snake_case from the DB).
@@ -45,6 +45,15 @@ export function useCreateObservation() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: ObservationCreateInput) => api.post<Observation>('/observations', data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: observationKeys.all }),
+  });
+}
+
+export function useUpdateObservation(id: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: ObservationUpdateInput) =>
+      api.patch<Observation>(`/observations/${id}`, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: observationKeys.all }),
   });
 }
