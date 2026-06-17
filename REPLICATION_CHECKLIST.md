@@ -38,11 +38,11 @@ Legend: ✅ matches · 🟡 exists, needs re-skin/feature pass · ⬜ not starte
 | 17 | Assessment | `/assessment` | ✅ |
 | 18 | Daily Logs | `/daily-logs` | ✅ |
 | 19 | Learning Journal | `/journal` | ✅ |
-| 20 | Reflections | `/reflections` | 🟡 |
-| 21 | SEND | `/send` | 🟡 |
-| 22 | Newsfeed | `/newsfeed` | 🟡 |
-| 23 | Medications | `/medications` | 🟡 |
-| 24 | Incidents | `/incidents` | 🟡 |
+| 20 | Reflections | `/reflections` | ✅ |
+| 21 | SEND | `/send` | ✅ |
+| 22 | Newsfeed | `/newsfeed` | ✅ |
+| 23 | Medications | `/medications` | ✅ |
+| 24 | Incidents | `/incidents` | ✅ |
 | 25 | Accident Book | `/accident-book` | 🟡 |
 | 26 | Ofsted Mode | `/ofsted` | 🟡 |
 | 27 | Compliance Hub | `/compliance` | 🟡 |
