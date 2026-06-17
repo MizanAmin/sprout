@@ -3,22 +3,61 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Design tokens as RGB channels so Tailwind opacity modifiers work and the
+   theme can flip at runtime. Light = default; .dark on <html> = dark mode.
+   Values mirror the live app (app.sproutnursery.co.uk). */
+:root {
+  --c-primary: 79 70 229;        --c-primary-light: 238 242 255;  --c-primary-dark: 67 56 202;
+  --c-success: 16 185 129;       --c-success-light: 209 250 229;
+  --c-warning: 245 158 11;       --c-warning-light: 254 243 199;
+  --c-danger: 239 68 68;         --c-danger-light: 254 226 226;
+  --c-info: 6 182 212;           --c-info-light: 207 250 254;
+  --c-purple: 139 92 246;        --c-purple-light: 237 233 254;
+  --c-muted: 100 116 139;        --c-border: 226 232 240;
+  --c-surface: 255 255 255;      --c-bg: 248 250 252;             --c-text: 15 23 42;
+  --c-sidebar: 15 23 42;         --c-sidebar-hover: 30 41 59;     --c-sidebar-active: 49 46 129;
+}
+.dark {
+  --c-primary: 99 102 241;       --c-primary-light: 30 27 75;     --c-primary-dark: 129 140 248;
+  --c-success: 52 211 153;       --c-success-light: 6 78 59;
+  --c-warning: 251 191 36;       --c-warning-light: 69 39 6;
+  --c-danger: 248 113 113;       --c-danger-light: 76 5 5;
+  --c-info: 34 211 238;          --c-info-light: 8 51 68;
+  --c-purple: 167 139 250;       --c-purple-light: 49 46 129;
+  --c-muted: 148 163 184;        --c-border: 51 65 85;
+  --c-surface: 30 41 59;         --c-bg: 11 17 32;                --c-text: 226 232 240;
+  --c-sidebar: 2 6 23;           --c-sidebar-hover: 30 41 59;     --c-sidebar-active: 49 46 129;
+  color-scheme: dark;
+}
+
 @layer base {
   html {
     font-family: 'Inter', system-ui, sans-serif;
   }
   body {
-    @apply bg-bg text-gray-900 antialiased;
+    @apply bg-bg antialiased;
+    color: rgb(var(--c-text));
     font-size: 14px;
   }
+  /* In dark mode, flip the hardcoded gray/white utilities pages use so text and
+     surfaces stay legible without auditing every component. */
+  .dark .text-gray-900 { color: rgb(226 232 240); }
+  .dark .text-gray-800 { color: rgb(203 213 225); }
+  .dark .text-gray-700 { color: rgb(203 213 225); }
+  .dark .text-gray-600 { color: rgb(148 163 184); }
+  .dark .text-gray-500 { color: rgb(148 163 184); }
+  .dark .bg-white { background-color: rgb(var(--c-surface)); }
+  .dark .bg-gray-50 { background-color: rgb(15 23 42); }
+  .dark .bg-gray-100 { background-color: rgb(51 65 85); }
 }
 
-/* Component classes mirroring the live app (app.sproutnursery.co.uk): indigo
-   primary, gradient buttons, soft cards, pill badges. radius 14/8. */
+/* Component classes mirroring the live app: indigo primary, gradient buttons,
+   soft cards, pill badges. radius 14/8. */
 @layer components {
   .input {
     @apply w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm
            outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20;
+    color: rgb(var(--c-text));
   }
 
   /* Buttons */
@@ -34,9 +73,10 @@
   }
   .btn-outline {
     @apply inline-flex items-center justify-center gap-1.5 rounded-lg border border-border
-           bg-surface px-4 py-2 text-sm font-semibold text-gray-900 transition
+           bg-surface px-4 py-2 text-sm font-semibold transition
            hover:-translate-y-px hover:border-primary hover:text-primary hover:bg-primary-light
            disabled:opacity-50;
+    color: rgb(var(--c-text));
   }
   .btn-success {
     @apply inline-flex items-center justify-center gap-1.5 rounded-lg bg-success px-4 py-2

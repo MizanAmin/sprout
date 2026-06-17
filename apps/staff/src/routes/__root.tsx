@@ -1,46 +1,55 @@
 import { createRootRoute, Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { supabase } from '@sprout/db';
+import { useCurrentUser } from '../features/auth/useCurrentUser';
+import { QuickJump } from '../components/QuickJump';
+import { initTheme, isDark, toggleTheme } from '../lib/theme';
 
 export const Route = createRootRoute({ component: RootShell });
 
-// Session type, inferred so we don't need a direct @supabase/supabase-js import.
 type Session = Awaited<ReturnType<typeof supabase.auth.getSession>>['data']['session'];
 
-// Primary navigation. Full page set lives under src/routes; this is a curated
-// sidebar — extend as sections are built out.
-const NAV: { to: string; label: string }[] = [
+// Full navigation. `mgr` items are hidden from non-manager staff (the API also
+// enforces this server-side). Order mirrors the live app's grouping.
+const NAV: { to: string; label: string; mgr?: boolean }[] = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/children', label: 'Children' },
   { to: '/relatives', label: 'Relatives' },
-  { to: '/rooms', label: 'Rooms' },
   { to: '/staff', label: 'Staff' },
-  { to: '/staff-dev', label: 'Staff Development' },
+  { to: '/staff-dev', label: 'Staff Development', mgr: true },
+  { to: '/enquiries', label: 'Enquiries', mgr: true },
+  { to: '/waiting-list', label: 'Waiting List', mgr: true },
+  { to: '/consents', label: 'Consent Forms', mgr: true },
+  { to: '/messages', label: 'Messages' },
+  { to: '/newsfeed', label: 'Newsfeed' },
+  { to: '/rooms', label: 'Rooms' },
+  { to: '/rota', label: 'Staff Rota' },
+  { to: '/sessions', label: 'Sessions & Funding' },
+  { to: '/planning', label: 'Planning' },
+  { to: '/monitoring', label: 'Monitoring' },
   { to: '/register', label: 'Live Register' },
-  { to: '/sessions', label: 'Sessions' },
-  { to: '/monitoring', label: 'Daily Monitoring' },
+  { to: '/fire-register', label: 'Fire Register' },
+  { to: '/calendar', label: 'Calendar' },
+  { to: '/assessment', label: 'Assessment' },
   { to: '/daily-logs', label: 'Daily Logs' },
   { to: '/journal', label: 'Learning Journal' },
-  { to: '/assessment', label: 'Assessment' },
-  { to: '/planning', label: 'Planning' },
   { to: '/reflections', label: 'Reflections' },
+  { to: '/send', label: 'SEND' },
   { to: '/medications', label: 'Medications' },
   { to: '/incidents', label: 'Incidents' },
   { to: '/accident-book', label: 'Accident Book' },
-  { to: '/fire-register', label: 'Fire Register' },
-  { to: '/send', label: 'SEND' },
-  { to: '/messages', label: 'Messages' },
-  { to: '/newsfeed', label: 'Newsfeed' },
-  { to: '/calendar', label: 'Calendar' },
-  { to: '/invoices', label: 'Invoices' },
-  { to: '/finance', label: 'Finance' },
-  { to: '/funding', label: 'Funding' },
-  { to: '/funded-hours', label: 'Funded Hours' },
-  { to: '/reports', label: 'Reports' },
-  { to: '/revenue-report', label: 'Revenue Report' },
-  { to: '/compliance', label: 'Compliance' },
-  { to: '/ofsted', label: 'Ofsted Readiness' },
-  { to: '/settings', label: 'Settings' },
+  { to: '/ofsted', label: 'Ofsted Mode', mgr: true },
+  { to: '/compliance', label: 'Compliance Hub', mgr: true },
+  { to: '/gdpr', label: 'GDPR', mgr: true },
+  { to: '/invoices', label: 'Invoices', mgr: true },
+  { to: '/finance', label: 'Finance', mgr: true },
+  { to: '/revenue-report', label: 'Revenue Report', mgr: true },
+  { to: '/funded-hours', label: 'Funded Hours', mgr: true },
+  { to: '/funding', label: 'Funding', mgr: true },
+  { to: '/reports', label: 'Reports', mgr: true },
+  { to: '/users', label: 'Staff Accounts', mgr: true },
+  { to: '/settings', label: 'Settings', mgr: true },
+  { to: '/billing', label: 'Billing', mgr: true },
 ];
 
 function RootShell() {
@@ -48,8 +57,12 @@ function RootShell() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const [session, setSession] = useState<Session>(null);
   const [ready, setReady] = useState(false);
+  const [dark, setDark] = useState(false);
+  const user = useCurrentUser();
 
   useEffect(() => {
+    initTheme();
+    setDark(isDark());
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setReady(true);
@@ -69,9 +82,7 @@ function RootShell() {
   if (!ready) {
     return <div className="flex min-h-screen items-center justify-center text-muted">Loading…</div>;
   }
-  // Login screen renders standalone (no app shell).
   if (isLogin) return <Outlet />;
-  // Signed out on a protected route — redirecting via the effect above.
   if (!session) return null;
 
   async function signOut() {
@@ -79,12 +90,19 @@ function RootShell() {
     navigate({ to: '/login' });
   }
 
+  // Managers see everything; staff get the non-manager subset.
+  const nav = user?.role === 'manager' || !user ? NAV : NAV.filter((n) => !n.mgr);
+  // Topbar title = the deepest matching nav label.
+  const current = [...nav]
+    .filter((n) => pathname === n.to || pathname.startsWith(n.to + '/'))
+    .sort((a, b) => b.to.length - a.to.length)[0];
+
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-bg">
       <aside className="flex w-60 shrink-0 flex-col bg-sidebar text-white">
-        <div className="px-5 py-5 text-lg font-semibold">🌱 Sprout</div>
-        <nav className="flex-1 space-y-1 overflow-y-auto px-2 pb-4">
-          {NAV.map((item) => (
+        <div className="flex items-center gap-2 px-5 py-5 text-lg font-semibold">🌱 Sprout</div>
+        <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 pb-4">
+          {nav.map((item) => (
             <Link
               key={item.to}
               to={item.to}
@@ -94,16 +112,46 @@ function RootShell() {
             </Link>
           ))}
         </nav>
-        <button
-          onClick={signOut}
-          className="m-2 rounded-md px-3 py-2 text-left text-sm text-white/70 hover:bg-white/10 hover:text-white"
-        >
-          Sign out
-        </button>
       </aside>
-      <main className="flex-1 overflow-auto">
-        <Outlet />
-      </main>
+
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Sticky translucent topbar */}
+        <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border bg-surface/80 px-6 backdrop-blur">
+          <h2 className="text-base font-semibold text-gray-900">{current?.label ?? ''}</h2>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                const e = new KeyboardEvent('keydown', { key: 'k', metaKey: true });
+                window.dispatchEvent(e);
+              }}
+              className="hidden items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs text-muted hover:text-gray-900 sm:flex"
+              title="Quick jump"
+            >
+              🔎 Jump <kbd className="rounded bg-gray-100 px-1 font-sans text-[10px]">⌘K</kbd>
+            </button>
+            <button
+              onClick={() => setDark(toggleTheme())}
+              className="rounded-lg border border-border px-2.5 py-1.5 text-sm hover:bg-gray-100"
+              title="Toggle dark mode"
+            >
+              {dark ? '☀️' : '🌙'}
+            </button>
+            {user?.name && <span className="hidden text-sm text-muted md:inline">{user.name}</span>}
+            <button
+              onClick={signOut}
+              className="rounded-lg border border-border px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
+            >
+              Sign out
+            </button>
+          </div>
+        </header>
+
+        <main className="flex-1 overflow-auto">
+          <Outlet />
+        </main>
+      </div>
+
+      <QuickJump items={nav.map((n) => ({ to: n.to, label: n.label }))} />
     </div>
   );
 }

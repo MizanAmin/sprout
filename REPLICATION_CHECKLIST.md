@@ -58,11 +58,11 @@ Legend: ✅ matches · 🟡 exists, needs re-skin/feature pass · ⬜ not starte
 | 37 | Staff Accounts | `/users` | ✅ |
 | 38 | Subscription & Billing | `/billing` | ✅ |
 
-## ⏳ Phase 3 — Cross-cutting features (from reference)
-- [ ] Light/Dark theme toggle (reference has `[data-theme="dark"]`)
-- [ ] Sticky translucent topbar (title + actions, 58px, blur)
-- [ ] Quick Jump command palette (Cmd/Ctrl-K) over all pages
-- [ ] Breadcrumbs on detail pages
-- [ ] Plan/role gating in nav (mgr-only + plan:'blossom' items)
-- [ ] EYFS 7-area tagging, mood map, daily-log summary tiles
-- [ ] Staff:child ratio indicators (1:3 / 1:5 / 1:8)
+## ✅ Phase 3 — Cross-cutting features (DONE)
+- [x] Light/Dark theme toggle (CSS-var tokens, persisted, OS-default)
+- [x] Sticky translucent topbar (page title + ⌘K + theme toggle + sign out)
+- [x] Quick Jump command palette (⌘K/Ctrl-K) over all pages
+- [x] Breadcrumbs on detail pages (child detail; Breadcrumb in ui.tsx)
+- [x] Role gating in nav (manager-only items hidden from staff). Plan gating pending — needs nursery plan in the session JWT.
+- [x] Shared EYFS areas + mood map + daily-log helpers (src/lib/eyfs.ts)
+- [x] Staff:child ratio helper (1:3/1:5/1:8) in src/lib/eyfs.ts

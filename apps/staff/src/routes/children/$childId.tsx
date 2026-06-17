@@ -7,7 +7,7 @@ import { sessionCreateSchema, type SessionCreateInput } from '@sprout/schemas';
 import { api } from '../../api';
 import { useChild, useUpdateChild } from '../../features/children/useChildren';
 import { ChildForm } from '../../features/children/ChildForm';
-import { Field, Badge, Spinner, EmptyState } from '../../components/ui';
+import { Field, Badge, Spinner, EmptyState, Breadcrumb } from '../../components/ui';
 
 export const Route = createFileRoute('/children/$childId')({ component: ChildDetailPage });
 
@@ -25,6 +25,7 @@ function ChildDetailPage() {
 
   return (
     <div className="space-y-4 p-6">
+      <Breadcrumb items={[{ label: 'Children', to: '/children' }, { label: child.name }]} />
       <h1 className="text-2xl font-semibold text-gray-900">{child.name}</h1>
 
       <div className="flex gap-1 border-b border-border">

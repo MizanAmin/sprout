@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Link } from '@tanstack/react-router';
 
 // Lightweight local UI primitives. These mirror the shapes intended for
 // @sprout/ui (StatCard, Modal, Badge, Field, EmptyState) and can be promoted
@@ -122,3 +123,22 @@ export function Spinner({ label = 'Loading…' }: { label?: string }) {
 
 export const gbp = (n: number) =>
   new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(n);
+
+export function Breadcrumb({ items }: { items: { label: string; to?: string }[] }) {
+  return (
+    <nav className="flex items-center gap-1.5 text-sm text-muted">
+      {items.map((it, i) => (
+        <span key={i} className="flex items-center gap-1.5">
+          {i > 0 && <span className="text-muted/60">/</span>}
+          {it.to ? (
+            <Link to={it.to as never} className="hover:text-primary">
+              {it.label}
+            </Link>
+          ) : (
+            <span className="text-gray-700">{it.label}</span>
+          )}
+        </span>
+      ))}
+    </nav>
+  );
+}
