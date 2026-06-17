@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
+import { z } from 'zod';
 import { userCreateSchema, userUpdateSchema } from '@sprout/schemas';
 import { requireAuth } from '../middleware/auth';
 import { requireRole } from '../middleware/requireRole';
@@ -61,6 +62,67 @@ app.post('/', requireRole('manager'), zValidator('json', userCreateSchema), asyn
   } catch (err) {
     // Roll back the orphaned auth user so a retry can reuse the email.
     await supabaseAdmin.auth.admin.deleteUser(data.user.id).catch(() => {});
+    throw err;
+  }
+});
+
+// --- POST /parent — invite a parent login linked to one or more children ------
+// Mirrors register-nursery's parent shape: a Supabase auth user with role
+// 'parent' + child_ids in the JWT claims, a public.users row, and user_children
+// links. The parent signs in via the parent app's email OTP.
+const parentInviteSchema = z.object({
+  name: z.string().min(1),
+  email: z.string().email(),
+  childIds: z.array(z.number().int().positive()).min(1),
+});
+
+app.post('/parent', requireRole('manager'), zValidator('json', parentInviteSchema), async (c) => {
+  const { nurseryId } = c.get('user');
+  const { name, email, childIds } = c.req.valid('json');
+
+  // 1) Validate every child belongs to this nursery (RLS-scoped).
+  const owned = await withTenant(nurseryId, (client) =>
+    client.query<{ id: number }>(
+      'SELECT id FROM children WHERE nursery_id=$1 AND id = ANY($2::int[])',
+      [nurseryId, childIds],
+    ),
+  );
+  if (owned.rows.length !== childIds.length) {
+    return c.json({ error: 'One or more children not found', code: 'VALIDATION_ERROR' }, 422);
+  }
+
+  // 2) Create the auth user (email pre-confirmed; parent logs in via OTP) with
+  //    parent claims.
+  const { data, error } = await supabaseAdmin.auth.admin.createUser({
+    email,
+    email_confirm: true,
+    user_metadata: { nursery_id: nurseryId, role: 'parent', name, child_ids: childIds },
+  });
+  if (error || !data?.user) {
+    return c.json({ error: error?.message ?? 'Failed to create parent', code: 'INTERNAL_ERROR' }, 500);
+  }
+  const userId = data.user.id;
+
+  // 3) Mirror into public.users + link children, rolling back the auth user on failure.
+  try {
+    const { rows } = await withTenant(nurseryId, async (client) => {
+      const r = await client.query(
+        `INSERT INTO users (id, nursery_id, name, email, role) VALUES ($1,$2,$3,$4,'parent')
+         RETURNING id, nursery_id, name, email, role, created_at`,
+        [userId, nurseryId, name, email],
+      );
+      for (const childId of childIds) {
+        await client.query(
+          `INSERT INTO user_children (nursery_id, user_id, child_id) VALUES ($1,$2,$3)
+           ON CONFLICT (user_id, child_id) DO NOTHING`,
+          [nurseryId, userId, childId],
+        );
+      }
+      return r;
+    });
+    return c.json(rows[0], 201);
+  } catch (err) {
+    await supabaseAdmin.auth.admin.deleteUser(userId).catch(() => {});
     throw err;
   }
 });

@@ -11,10 +11,12 @@ import {
 import {
   useUsers,
   useCreateUser,
+  useInviteParent,
   useUpdateUser,
   useDeleteUser,
   type User,
 } from '../features/users/useUsers';
+import { useChildren } from '../features/children/useChildren';
 import { useCurrentUser } from '../features/auth/useCurrentUser';
 import { Field, Modal, Badge, Spinner, EmptyState } from '../components/ui';
 
@@ -74,10 +76,12 @@ function UserAvatar({ name }: { name: string }) {
 function UsersPage() {
   const { data: users, isLoading } = useUsers();
   const createUser = useCreateUser();
+  const inviteParent = useInviteParent();
   const deleteUser = useDeleteUser();
   const currentUserId = useCurrentUser()?.id ?? null;
 
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [parentOpen, setParentOpen] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
 
   // Reference splits the page into staff/manager logins and parent logins.
@@ -94,9 +98,14 @@ function UsersPage() {
     <div className="space-y-4 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-gray-900">Staff Accounts</h1>
-        <button className="btn-primary" onClick={() => setInviteOpen(true)}>
-          + Add account
-        </button>
+        <div className="flex gap-2">
+          <button className="btn-outline" onClick={() => setParentOpen(true)}>
+            + Invite parent
+          </button>
+          <button className="btn-primary" onClick={() => setInviteOpen(true)}>
+            + Add account
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -135,6 +144,14 @@ function UsersPage() {
         <InviteUserForm
           submitting={createUser.isPending}
           onSubmit={(d) => createUser.mutate(d, { onSuccess: () => setInviteOpen(false) })}
+        />
+      </Modal>
+
+      <Modal open={parentOpen} onClose={() => setParentOpen(false)} title="Invite parent">
+        <ParentInviteForm
+          submitting={inviteParent.isPending}
+          error={inviteParent.error ? (inviteParent.error as Error).message : null}
+          onSubmit={(d) => inviteParent.mutate(d, { onSuccess: () => setParentOpen(false) })}
         />
       </Modal>
 
@@ -266,13 +283,85 @@ function InviteUserForm({
           <option value="staff">👤 Staff — operational access</option>
           <option value="manager">👑 Manager — full access</option>
         </select>
-        {/* TODO: parent invites — the reference also creates parent logins
-            linked to a child, but userCreateSchema/POST /users only supports
-            staff/manager invites (no child_id). Needs a parent-invite endpoint. */}
       </Field>
       <div className="flex justify-end">
         <button type="submit" className="btn-primary" disabled={submitting}>
           {submitting ? 'Sending invite…' : 'Send invite'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ── Parent invite — name + email + linked children ──────────────────────
+function ParentInviteForm({
+  onSubmit,
+  submitting,
+  error,
+}: {
+  onSubmit: (d: { name: string; email: string; childIds: number[] }) => void;
+  submitting: boolean;
+  error: string | null;
+}) {
+  const { data: children } = useChildren();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [childIds, setChildIds] = useState<number[]>([]);
+  const active = (children ?? []).filter((c) => c.status === 'Active');
+
+  const toggle = (id: number) =>
+    setChildIds((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+
+  const submit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim() || !email.trim() || childIds.length === 0) return;
+    onSubmit({ name: name.trim(), email: email.trim(), childIds });
+  };
+
+  return (
+    <form onSubmit={submit} className="space-y-4">
+      <p className="text-sm text-muted">
+        Creates a parent login linked to the selected child(ren). The parent signs in to the Sprout
+        parent app with this email (a one-time code is emailed to them).
+      </p>
+      <Field label="Parent name">
+        <input className="input" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+      </Field>
+      <Field label="Email">
+        <input
+          className="input"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+      </Field>
+      <Field label="Linked children">
+        {active.length === 0 ? (
+          <p className="text-sm text-muted">No active children to link.</p>
+        ) : (
+          <div className="max-h-48 space-y-1 overflow-y-auto rounded-lg border border-border p-2">
+            {active.map((c) => (
+              <label key={c.id} className="flex items-center gap-2 px-1 py-1 text-sm">
+                <input
+                  type="checkbox"
+                  checked={childIds.includes(c.id)}
+                  onChange={() => toggle(c.id)}
+                />
+                {c.name}
+                {c.room ? <span className="text-muted">· {c.room}</span> : null}
+              </label>
+            ))}
+          </div>
+        )}
+      </Field>
+      {error && <p className="text-sm text-danger">{error}</p>}
+      <div className="flex justify-end">
+        <button
+          type="submit"
+          className="btn-primary"
+          disabled={submitting || !name.trim() || !email.trim() || childIds.length === 0}
+        >
+          {submitting ? 'Inviting…' : 'Invite parent'}
         </button>
       </div>
     </form>

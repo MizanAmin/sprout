@@ -21,7 +21,7 @@
 - **Auto-invoicing config panel** + job-history/reminder-log + per-invoice payment ledger.
 - **Full structured rota model** (per-shift type/start/end/room/notes columns) — weekends done; the rest is a model overhaul.
 - **Consent bulk-send**, **settings invoice-config / preferences** toggles, compliance signoff/item aggregate counts, all-children assessment view.
-- **Parent-invite flow** (`POST /users` only invites staff/managers today).
+- **Parent invite** — ✅ done: `POST /users/parent` creates a parent login (role parent + child_ids) linked to children, with a Staff Accounts "Invite parent" modal.
 
 ---
 

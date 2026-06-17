@@ -29,6 +29,20 @@ export function useCreateUser() {
   });
 }
 
+export interface ParentInviteInput {
+  name: string;
+  email: string;
+  childIds: number[];
+}
+
+export function useInviteParent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: ParentInviteInput) => api.post<User>('/users/parent', data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: userKeys.all }),
+  });
+}
+
 export function useUpdateUser(id: string) {
   const qc = useQueryClient();
   return useMutation({
