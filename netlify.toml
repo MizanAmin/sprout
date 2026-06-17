@@ -1,0 +1,26 @@
+# Netlify config for the STAFF web app (Vite SPA) — free static hosting + CDN.
+# Connect this repo as a Netlify site (one-time): https://app.netlify.com → Add
+# new site → Import from GitHub → pick MizanAmin/sprout. Netlify reads this file,
+# so no build settings to fill in. It auto-deploys on every push to main.
+#
+# The VITE_* values below are PUBLIC by design — the Supabase publishable key and
+# URLs are embedded in the client bundle regardless — so baking them in here is
+# safe and makes the deploy zero-config. (Do NOT put the Supabase secret key or
+# DATABASE_URL here; those are server-only and live on the Railway API service.)
+
+[build]
+  command = "pnpm --filter @sprout/staff build"
+  publish = "apps/staff/dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+  VITE_SUPABASE_URL = "https://udmnrzemfcbtiejdqyut.supabase.co"
+  VITE_SUPABASE_ANON_KEY = "sb_publishable_vZFs5XUjFpv9GUgGtNPDZA_g9ogy4KQ"
+  VITE_API_URL = "https://sprout-production-8da1.up.railway.app"
+
+# SPA fallback: TanStack Router does client-side routing, so every path must
+# serve index.html (otherwise deep links / refreshes 404).
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
