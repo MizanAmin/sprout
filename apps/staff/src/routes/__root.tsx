@@ -1,6 +1,11 @@
-import { createRootRoute, Link, Outlet } from '@tanstack/react-router';
+import { createRootRoute, Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
+import { useEffect, useState } from 'react';
+import { supabase } from '@sprout/db';
 
 export const Route = createRootRoute({ component: RootShell });
+
+// Session type, inferred so we don't need a direct @supabase/supabase-js import.
+type Session = Awaited<ReturnType<typeof supabase.auth.getSession>>['data']['session'];
 
 // Primary navigation. Full page set lives under src/routes; this is a curated
 // sidebar — extend as sections are built out.
@@ -24,6 +29,41 @@ const NAV: { to: string; label: string }[] = [
 ];
 
 function RootShell() {
+  const navigate = useNavigate();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const [session, setSession] = useState<Session>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setReady(true);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => setSession(s));
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  const isLogin = pathname === '/login';
+
+  useEffect(() => {
+    if (!ready) return;
+    if (!session && !isLogin) navigate({ to: '/login' });
+    if (session && isLogin) navigate({ to: '/dashboard' });
+  }, [ready, session, isLogin, navigate]);
+
+  if (!ready) {
+    return <div className="flex min-h-screen items-center justify-center text-muted">Loading…</div>;
+  }
+  // Login screen renders standalone (no app shell).
+  if (isLogin) return <Outlet />;
+  // Signed out on a protected route — redirecting via the effect above.
+  if (!session) return null;
+
+  async function signOut() {
+    await supabase.auth.signOut();
+    navigate({ to: '/login' });
+  }
+
   return (
     <div className="flex min-h-screen">
       <aside className="flex w-60 shrink-0 flex-col bg-sidebar text-white">
@@ -39,6 +79,12 @@ function RootShell() {
             </Link>
           ))}
         </nav>
+        <button
+          onClick={signOut}
+          className="m-2 rounded-md px-3 py-2 text-left text-sm text-white/70 hover:bg-white/10 hover:text-white"
+        >
+          Sign out
+        </button>
       </aside>
       <main className="flex-1 overflow-auto">
         <Outlet />
