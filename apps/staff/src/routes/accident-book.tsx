@@ -9,6 +9,7 @@ import {
   type Accident,
 } from '../features/accident-book/useAccidentBook';
 import { useChildren } from '../features/children/useChildren';
+import { useStaff } from '../features/staff/useStaff';
 import { Modal, Field, Spinner, EmptyState, Badge, StatCard } from '../components/ui';
 
 export const Route = createFileRoute('/accident-book')({
@@ -316,6 +317,7 @@ function AccidentForm({
   submitting?: boolean;
 }) {
   const { data: children } = useChildren();
+  const { data: staff } = useStaff();
 
   const [childId, setChildId] = useState<number | ''>('');
   const [childName, setChildName] = useState('');
@@ -355,6 +357,13 @@ function AccidentForm({
     childId !== '' ? (children ?? []).find((c) => c.id === childId) : undefined;
   const allergy = (selectedChild?.allergy ?? '').trim();
   const hasAllergy = allergy !== '' && allergy.toLowerCase() !== 'none';
+
+  // Build the dropdown options from staff names, appending the current value as
+  // an extra option when it's legacy free text not matching any staff name (so
+  // editing an existing record doesn't silently drop the saved value).
+  const staffNames = (staff ?? []).map((s) => s.name);
+  const staffOptions = (current: string) =>
+    current && !staffNames.includes(current) ? [current, ...staffNames] : staffNames;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -501,16 +510,28 @@ function AccidentForm({
 
       <div className="grid grid-cols-2 gap-4">
         <Field label="First aider / treating staff">
-          {/* TODO: the reference populates this from a /staff list; the staff app
-              exposes no staff endpoint, so this stays a free-text input. */}
-          <input
+          <select
             className="input"
             value={firstAider}
             onChange={(e) => setFirstAider(e.target.value)}
-          />
+          >
+            <option value="">— Select —</option>
+            {staffOptions(firstAider).map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
         </Field>
         <Field label="Witnessed by">
-          <input className="input" value={witness} onChange={(e) => setWitness(e.target.value)} />
+          <select className="input" value={witness} onChange={(e) => setWitness(e.target.value)}>
+            <option value="">— Select —</option>
+            {staffOptions(witness).map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
         </Field>
       </div>
 

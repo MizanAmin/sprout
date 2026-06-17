@@ -9,6 +9,7 @@ import {
   type Staff,
 } from '../features/staff/useStaff';
 import { StaffForm } from '../features/staff/StaffForm';
+import { useCurrentUser } from '../features/auth/useCurrentUser';
 import { Modal, Badge, Spinner, EmptyState } from '../components/ui';
 
 export const Route = createFileRoute('/staff')({
@@ -48,6 +49,7 @@ function StaffPage() {
   const { data: staff, isLoading } = useStaff();
   const createStaff = useCreateStaff();
   const deleteStaff = useDeleteStaff();
+  const isManager = useCurrentUser()?.role === 'manager';
 
   const [search, setSearch] = useState('');
   const [room, setRoom] = useState('');
@@ -80,9 +82,11 @@ function StaffPage() {
     <div className="space-y-4 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-gray-900">Staff</h1>
-        <button className="btn-primary" onClick={openAdd}>
-          Add staff
-        </button>
+        {isManager && (
+          <button className="btn-primary" onClick={openAdd}>
+            Add staff
+          </button>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-3">
@@ -128,6 +132,7 @@ function StaffPage() {
             <StaffCard
               key={s.id}
               staff={s}
+              isManager={isManager}
               onEdit={() => openEdit(s)}
               onDelete={() => {
                 if (confirm(`Delete ${s.name}?`)) deleteStaff.mutate(s.id);
@@ -152,10 +157,12 @@ function StaffPage() {
 // phone, status badge, and manager edit/delete actions (mirrors reference `pgStaff`).
 function StaffCard({
   staff,
+  isManager,
   onEdit,
   onDelete,
 }: {
   staff: Staff;
+  isManager: boolean;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -187,16 +194,16 @@ function StaffCard({
         <Badge variant={staff.status === 'Active' ? 'success' : 'muted'}>{staff.status}</Badge>
       </div>
 
-      {/* TODO: gate edit/delete behind a manager role check (reference uses isManager()) —
-          needs a current-user/role context in apps/staff (not yet available). */}
-      <div className="mt-3 flex gap-2">
-        <button className="btn-outline btn-sm" onClick={onEdit}>
-          Edit
-        </button>
-        <button className="btn-outline btn-sm text-danger" onClick={onDelete}>
-          Delete
-        </button>
-      </div>
+      {isManager && (
+        <div className="mt-3 flex gap-2">
+          <button className="btn-outline btn-sm" onClick={onEdit}>
+            Edit
+          </button>
+          <button className="btn-outline btn-sm text-danger" onClick={onDelete}>
+            Delete
+          </button>
+        </div>
+      )}
     </div>
   );
 }

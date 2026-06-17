@@ -9,6 +9,7 @@ import {
   type Incident,
 } from '../features/incidents/useIncidents';
 import { useChildren } from '../features/children/useChildren';
+import { useStaff } from '../features/staff/useStaff';
 import { Modal, Field, Spinner, EmptyState, Badge, StatCard } from '../components/ui';
 
 export const Route = createFileRoute('/incidents')({
@@ -274,6 +275,8 @@ function IncidentForm({
   submitting?: boolean;
 }) {
   const { data: children } = useChildren();
+  const { data: staff } = useStaff();
+  const staffList = staff ?? [];
 
   const [childId, setChildId] = useState<number | ''>('');
   const [childName, setChildName] = useState('');
@@ -421,12 +424,31 @@ function IncidentForm({
 
       <div className="grid grid-cols-2 gap-4">
         <Field label="Recorded by">
-          {/* TODO: the reference populates this from a /staff list. The staff
-              app exposes no staff endpoint, so this stays a free-text input. */}
-          <input className="input" value={reportedBy} onChange={(e) => setReportedBy(e.target.value)} />
+          {/* Staff names are sourced from the /staff list via useStaff(). */}
+          <select className="input" value={reportedBy} onChange={(e) => setReportedBy(e.target.value)}>
+            <option value="">— Select —</option>
+            {reportedBy && !staffList.some((s) => s.name === reportedBy) && (
+              <option value={reportedBy}>{reportedBy}</option>
+            )}
+            {staffList.map((s) => (
+              <option key={s.id} value={s.name}>
+                {s.name}
+              </option>
+            ))}
+          </select>
         </Field>
         <Field label="Witnessed by">
-          <input className="input" value={witness} onChange={(e) => setWitness(e.target.value)} />
+          <select className="input" value={witness} onChange={(e) => setWitness(e.target.value)}>
+            <option value="">— Select —</option>
+            {witness && !staffList.some((s) => s.name === witness) && (
+              <option value={witness}>{witness}</option>
+            )}
+            {staffList.map((s) => (
+              <option key={s.id} value={s.name}>
+                {s.name}
+              </option>
+            ))}
+          </select>
         </Field>
       </div>
 

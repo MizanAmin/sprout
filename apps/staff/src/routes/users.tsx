@@ -15,6 +15,7 @@ import {
   useDeleteUser,
   type User,
 } from '../features/users/useUsers';
+import { useCurrentUser } from '../features/auth/useCurrentUser';
 import { Field, Modal, Badge, Spinner, EmptyState } from '../components/ui';
 
 export const Route = createFileRoute('/users')({
@@ -74,6 +75,7 @@ function UsersPage() {
   const { data: users, isLoading } = useUsers();
   const createUser = useCreateUser();
   const deleteUser = useDeleteUser();
+  const currentUserId = useCurrentUser()?.id ?? null;
 
   const [inviteOpen, setInviteOpen] = useState(false);
   const [editing, setEditing] = useState<User | null>(null);
@@ -112,6 +114,7 @@ function UsersPage() {
             users={staff}
             emptyTitle="No staff accounts yet"
             emptyDescription="Invite team members so they can access the app."
+            currentUserId={currentUserId}
             onEdit={setEditing}
             onDelete={onDelete}
           />
@@ -121,6 +124,7 @@ function UsersPage() {
             users={parents}
             emptyTitle="No parent accounts yet"
             emptyDescription="Parent logins are provisioned separately and linked to a child."
+            currentUserId={currentUserId}
             onEdit={setEditing}
             onDelete={onDelete}
           />
@@ -152,6 +156,7 @@ function AccountsCard({
   users,
   emptyTitle,
   emptyDescription,
+  currentUserId,
   onEdit,
   onDelete,
 }: {
@@ -160,6 +165,7 @@ function AccountsCard({
   users: User[];
   emptyTitle: string;
   emptyDescription: string;
+  currentUserId: string | null;
   onEdit: (u: User) => void;
   onDelete: (u: User) => void;
 }) {
@@ -185,35 +191,40 @@ function AccountsCard({
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {users.map((u) => (
-                <tr key={u.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-2">
-                    <div className="flex items-center gap-3">
-                      <UserAvatar name={u.name} />
-                      <span className="font-semibold text-gray-900">{u.name}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-2 text-muted">{u.email}</td>
-                  <td className="px-4 py-2">
-                    <Badge variant={ROLE_META[u.role].variant}>{ROLE_META[u.role].label}</Badge>
-                  </td>
-                  <td className="px-4 py-2 text-muted">{u.created_at?.slice(0, 10) ?? '—'}</td>
-                  <td className="px-4 py-2 text-right">
-                    {/* TODO: hide edit/delete for the current user — needs a
-                        current-user/session hook (e.g. GET /auth/me) so we can
-                        compare against u.id; the server already blocks self-delete. */}
-                    <button className="btn-outline btn-sm" onClick={() => onEdit(u)}>
-                      ✏️ Edit
-                    </button>
-                    <button
-                      className="btn-outline btn-sm ml-2 text-danger"
-                      onClick={() => onDelete(u)}
-                    >
-                      🗑️ Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {users.map((u) => {
+                const isSelf = currentUserId !== null && String(u.id) === currentUserId;
+                return (
+                  <tr key={u.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-2">
+                      <div className="flex items-center gap-3">
+                        <UserAvatar name={u.name} />
+                        <span className="font-semibold text-gray-900">{u.name}</span>
+                        {isSelf && <span className="text-muted">(you)</span>}
+                      </div>
+                    </td>
+                    <td className="px-4 py-2 text-muted">{u.email}</td>
+                    <td className="px-4 py-2">
+                      <Badge variant={ROLE_META[u.role].variant}>{ROLE_META[u.role].label}</Badge>
+                    </td>
+                    <td className="px-4 py-2 text-muted">{u.created_at?.slice(0, 10) ?? '—'}</td>
+                    <td className="px-4 py-2 text-right">
+                      {!isSelf && (
+                        <>
+                          <button className="btn-outline btn-sm" onClick={() => onEdit(u)}>
+                            ✏️ Edit
+                          </button>
+                          <button
+                            className="btn-outline btn-sm ml-2 text-danger"
+                            onClick={() => onDelete(u)}
+                          >
+                            🗑️ Delete
+                          </button>
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

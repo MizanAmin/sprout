@@ -9,6 +9,7 @@ import {
   type ReflectionInput,
 } from '../features/reflections/useReflections';
 import { useChildren } from '../features/children/useChildren';
+import { useStaff } from '../features/staff/useStaff';
 import { Modal, Field, Spinner, EmptyState, Badge, StatCard } from '../components/ui';
 
 export const Route = createFileRoute('/reflections')({
@@ -300,6 +301,7 @@ function ReflectionForm({
   onSubmit: (data: ReflectionInput) => void;
 }) {
   const { data: children } = useChildren();
+  const { data: staff } = useStaff();
   const [childId, setChildId] = useState<number | ''>(initial?.child_id ?? '');
   const [date, setDate] = useState(initial?.date ?? '');
   const [whatWentWell, setWhatWentWell] = useState(initial?.what_went_well ?? '');
@@ -308,6 +310,15 @@ function ReflectionForm({
   );
   const [nextSteps, setNextSteps] = useState(initial?.next_steps ?? '');
   const [practitioner, setPractitioner] = useState(initial?.practitioner ?? '');
+
+  // Build the dropdown options from staff names, appending the current value as
+  // an extra option when it's legacy free text not matching any staff name (so
+  // editing an existing reflection doesn't silently drop the saved value).
+  const staffNames = (staff ?? []).map((s) => s.name);
+  const practitionerOptions =
+    practitioner && !staffNames.includes(practitioner)
+      ? [practitioner, ...staffNames]
+      : staffNames;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -382,12 +393,18 @@ function ReflectionForm({
       </Field>
 
       <Field label="Practitioner">
-        <input
+        <select
           className="input"
           value={practitioner}
           onChange={(e) => setPractitioner(e.target.value)}
-          placeholder="Who recorded this reflection"
-        />
+        >
+          <option value="">— Select —</option>
+          {practitionerOptions.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
       </Field>
 
       <div className="flex justify-end">

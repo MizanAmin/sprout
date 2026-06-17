@@ -9,6 +9,7 @@ import {
   type Medication,
 } from '../features/medications/useMedications';
 import { useChildren, type Child } from '../features/children/useChildren';
+import { useStaff } from '../features/staff/useStaff';
 import { Modal, Field, Spinner, EmptyState, Badge, StatCard } from '../components/ui';
 
 export const Route = createFileRoute('/medications')({
@@ -321,6 +322,9 @@ function MedicationForm({
   onSubmit: (data: MedicationCreateInput) => void;
   submitting?: boolean;
 }) {
+  const { data: staff } = useStaff();
+  const staffList = staff ?? [];
+
   const [childId, setChildId] = useState<number | ''>('');
   const [medicationName, setMedicationName] = useState('');
   const [dose, setDose] = useState('');
@@ -500,13 +504,32 @@ function MedicationForm({
 
       <div className="grid grid-cols-2 gap-4">
         {/* Administration record: who gave it, who witnessed, time given.
-            TODO: needs a /staff endpoint to offer staff pickers here instead
-            of free-text (reference populates these from API.get('/staff')). */}
+            Staff names are sourced from the /staff list via useStaff(). */}
         <Field label="Given by">
-          <input className="input" value={givenBy} onChange={(e) => setGivenBy(e.target.value)} />
+          <select className="input" value={givenBy} onChange={(e) => setGivenBy(e.target.value)}>
+            <option value="">— Select —</option>
+            {givenBy && !staffList.some((s) => s.name === givenBy) && (
+              <option value={givenBy}>{givenBy}</option>
+            )}
+            {staffList.map((s) => (
+              <option key={s.id} value={s.name}>
+                {s.name}
+              </option>
+            ))}
+          </select>
         </Field>
         <Field label="Witness by">
-          <input className="input" value={witnessBy} onChange={(e) => setWitnessBy(e.target.value)} />
+          <select className="input" value={witnessBy} onChange={(e) => setWitnessBy(e.target.value)}>
+            <option value="">— Select —</option>
+            {witnessBy && !staffList.some((s) => s.name === witnessBy) && (
+              <option value={witnessBy}>{witnessBy}</option>
+            )}
+            {staffList.map((s) => (
+              <option key={s.id} value={s.name}>
+                {s.name}
+              </option>
+            ))}
+          </select>
         </Field>
       </div>
 

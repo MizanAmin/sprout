@@ -55,7 +55,7 @@ Legend: **DB** = migration + zod schema + route field · **API** = new route/han
 | auto-invoicing config + job-history/reminder-log; per-invoice payment ledger; "charge DD" | Auto-invoicing panel, ledger | Invoices |
 | CSV import/export (children, relatives) | Bulk data in/out | Children, Relatives |
 
-## C. Frontend follow-ups (no backend needed — now unblocked)
+## ✅ C. Frontend follow-ups — DONE (staff pickers + role gating wired; parent invites still pending)
 
 These were marked "needs /staff" or "needs current user", but those already exist
 after recent work — they're just not wired into every form yet:
