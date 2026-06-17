@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -11,47 +11,99 @@ import {
   addWeeks,
   type RotaRow,
 } from '../features/rota/useRota';
-import { Spinner, EmptyState, Field } from '../components/ui';
+import { useStaff } from '../features/staff/useStaff';
+import { Modal, Field, Spinner, EmptyState, Badge } from '../components/ui';
 
 export const Route = createFileRoute('/rota')({
   component: RotaPage,
 });
 
-const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri'] as const;
-const DAY_LABELS: Record<(typeof DAYS)[number], string> = {
+// The reference grid shows a Mon–Sun week, but the live `rota` table (migration
+// 005, see apps/api/src/routes/rota.ts) only stores mon..fri text columns —
+// one row per (staff_name, week_start). Sat/Sun are shown as read-only placeholders.
+// TODO: needs the `rota` schema extended with sat/fri columns (and the API
+// create/update schema) to make weekend cells editable.
+const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri'] as const;
+type Weekday = (typeof WEEKDAYS)[number];
+const WEEKEND = ['sat', 'sun'] as const;
+
+const DAY_LABELS: Record<string, string> = {
   mon: 'Mon',
   tue: 'Tue',
   wed: 'Wed',
   thu: 'Thu',
   fri: 'Fri',
+  sat: 'Sat',
+  sun: 'Sun',
 };
 
-const rotaFormSchema = z.object({
-  staffName: z.string().min(1, 'Staff name is required'),
-  weekStart: z.string().min(1, 'Week is required'),
-  mon: z.string().optional(),
-  tue: z.string().optional(),
-  wed: z.string().optional(),
-  thu: z.string().optional(),
-  fri: z.string().optional(),
-});
-type RotaFormInput = z.infer<typeof rotaFormSchema>;
+// UK date formatting to mirror fmtDateUK() in the reference.
+const fmtDateUK = (iso: string) =>
+  new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+const initials = (name: string) =>
+  name
+    .split(' ')
+    .map((p) => p[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+
+const surname = (name: string) => name.split(' ').slice(-1)[0] || name;
+
+// The reference treats each cell as a coloured "shift" badge. We don't have a
+// structured shift type/time/room in the live model — only a free-text value per
+// day (e.g. "8-4 · Sunflower"). Heuristically classify it for badge colour so the
+// grid reads like the reference (Off / Holiday / Sick / Training vs a worked shift).
+// TODO: needs structured shift fields (type, start_time, end_time, room) on the
+// rota table to colour-code reliably instead of parsing free text.
+function shiftVariant(value: string): 'success' | 'info' | 'danger' | 'warning' | 'muted' {
+  const v = value.trim().toLowerCase();
+  if (!v || v === 'off') return 'muted';
+  if (v.startsWith('hol')) return 'info';
+  if (v.startsWith('sick')) return 'danger';
+  if (v.startsWith('train')) return 'warning';
+  return 'success';
+}
+
+interface CellTarget {
+  staffName: string;
+  day: Weekday;
+}
 
 function RotaPage() {
   const [weekStart, setWeekStart] = useState(() => mondayOf(new Date()));
   const { data: rows, isLoading } = useRota(weekStart);
-  const upsertRota = useUpsertRota();
+  const { data: staff, isLoading: staffLoading } = useStaff();
   const deleteRota = useDeleteRota();
 
-  const [editing, setEditing] = useState<RotaRow | null>(null);
+  // null = closed; CellTarget = add/edit a specific staff+day cell.
+  const [editing, setEditing] = useState<CellTarget | null>(null);
+
+  // Index rota rows by staff_name for O(1) cell lookups.
+  const rowByStaff = useMemo(() => {
+    const map = new Map<string, RotaRow>();
+    for (const r of rows ?? []) map.set(r.staff_name, r);
+    return map;
+  }, [rows]);
+
+  // Active staff drive the grid rows (mirrors the reference's activeStaff). This
+  // surfaces staff who have no rota row yet so a shift can be added for them.
+  const activeStaff = useMemo(
+    () => (staff ?? []).filter((s) => s.status === 'Active'),
+    [staff],
+  );
+
+  const loading = isLoading || staffLoading;
 
   return (
     <div className="space-y-4 p-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-gray-900">Rota</h1>
+        <h1 className="text-2xl font-semibold text-gray-900">Staff Rota</h1>
         <div className="flex items-center gap-2">
           <button
-            className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="btn-outline btn-sm"
             onClick={() => setWeekStart((w) => addWeeks(w, -1))}
           >
             ← Prev
@@ -60,10 +112,12 @@ function RotaPage() {
             type="date"
             className="input max-w-[10rem]"
             value={weekStart}
-            onChange={(e) => setWeekStart(mondayOf(new Date(e.target.value)))}
+            onChange={(e) =>
+              e.target.value && setWeekStart(mondayOf(new Date(e.target.value)))
+            }
           />
           <button
-            className="rounded-lg border border-border px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="btn-outline btn-sm"
             onClick={() => setWeekStart((w) => addWeeks(w, 1))}
           >
             Next →
@@ -71,134 +125,256 @@ function RotaPage() {
         </div>
       </div>
 
-      <p className="text-sm text-muted">Week beginning Monday {weekStart}</p>
-
-      {isLoading ? (
+      {loading ? (
         <Spinner />
-      ) : (rows ?? []).length === 0 ? (
-        <EmptyState title="No rota for this week" description="Add a staff member below." />
+      ) : activeStaff.length === 0 ? (
+        <EmptyState
+          title="No active staff yet"
+          description="Add team members on the Staff page to start building the weekly rota."
+        />
       ) : (
-        <div className="overflow-hidden rounded-xl border border-border bg-surface">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-gray-50 text-muted">
-              <tr>
-                <th className="px-4 py-2 font-medium">Staff</th>
-                {DAYS.map((d) => (
-                  <th key={d} className="px-4 py-2 font-medium">
-                    {DAY_LABELS[d]}
-                  </th>
-                ))}
-                <th className="px-4 py-2 font-medium text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {(rows ?? []).map((r) => (
-                <tr key={r.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-2 font-medium text-gray-900">{r.staff_name}</td>
-                  {DAYS.map((d) => (
-                    <td key={d} className="px-4 py-2">
-                      {r[d] || '—'}
-                    </td>
+        <div className="card p-0">
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <span className="text-sm font-semibold text-gray-900">
+              Week of {fmtDateUK(weekStart)}
+            </span>
+            <span className="text-xs text-muted">{activeStaff.length} active staff</span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] border-collapse text-left">
+              <thead>
+                <tr className="bg-bg text-[10px] uppercase tracking-wide text-muted">
+                  <th className="px-3 py-2 font-semibold">Staff Member</th>
+                  {[...WEEKDAYS, ...WEEKEND].map((d) => (
+                    <th key={d} className="px-3 py-2 font-semibold">
+                      {DAY_LABELS[d]}
+                    </th>
                   ))}
-                  <td className="px-4 py-2 text-right">
-                    <button className="text-sm text-primary" onClick={() => setEditing(r)}>
-                      Edit
-                    </button>
-                    <button
-                      className="ml-3 text-sm text-danger"
-                      onClick={() => {
-                        if (confirm(`Delete rota for ${r.staff_name}?`)) deleteRota.mutate(r.id);
-                      }}
-                    >
-                      Delete
-                    </button>
-                  </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {activeStaff.map((s) => {
+                  const row = rowByStaff.get(s.name);
+                  return (
+                    <tr key={s.id} className="align-top">
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
+                            {initials(s.name)}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="truncate text-xs font-bold text-gray-900">
+                              {surname(s.name)}
+                            </div>
+                            <div className="truncate text-[10px] text-muted">{s.role}</div>
+                          </div>
+                        </div>
+                      </td>
+
+                      {WEEKDAYS.map((d) => {
+                        const value = (row?.[d] ?? '').trim();
+                        return (
+                          <td key={d} className="px-2 py-2">
+                            <button
+                              type="button"
+                              className="flex min-h-[44px] w-full flex-col items-start gap-1 rounded-lg border border-transparent p-1 text-left hover:border-border hover:bg-bg"
+                              onClick={() => setEditing({ staffName: s.name, day: d })}
+                            >
+                              {value ? (
+                                <Badge variant={shiftVariant(value)}>{value}</Badge>
+                              ) : (
+                                <span className="text-base text-border">+</span>
+                              )}
+                            </button>
+                          </td>
+                        );
+                      })}
+
+                      {/* Weekend cells are read-only until the model supports sat/sun. */}
+                      {WEEKEND.map((d) => (
+                        <td key={d} className="px-2 py-2">
+                          <div
+                            className="flex min-h-[44px] w-full items-center justify-center rounded-lg border border-dashed border-border/60 text-[10px] text-muted"
+                            title="Weekend shifts are not yet supported by the rota model"
+                          >
+                            —
+                          </div>
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
-      <RotaForm
-        key={editing?.id ?? 'new'}
-        editing={editing}
-        weekStart={weekStart}
-        submitting={upsertRota.isPending}
-        onSubmit={(data) =>
-          upsertRota.mutate(
-            { ...data, weekStart },
-            { onSuccess: () => setEditing(null) },
-          )
-        }
-        onCancel={() => setEditing(null)}
-      />
+      {editing && (
+        <ShiftModal
+          target={editing}
+          weekStart={weekStart}
+          existing={rowByStaff.get(editing.staffName) ?? null}
+          onClose={() => setEditing(null)}
+          onDelete={(id) => {
+            if (confirm(`Clear all shifts for ${editing.staffName} this week?`)) {
+              deleteRota.mutate(id, { onSuccess: () => setEditing(null) });
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
 
-function RotaForm({
-  editing,
+// ── Add / edit shift modal ───────────────────────────────────────────────────
+// The reference modal captures Type, Start/End time, Room and Notes for a single
+// shift. The live API stores a single free-text value per day, so we compose
+// those inputs into one string ("08:00-17:00 · Room") and write it to the relevant
+// day column via the upsert endpoint (which merges onto the existing week row).
+// TODO: needs structured shift columns on the rota table to persist type/start/
+// end/room/notes separately instead of a composed free-text string.
+
+const shiftFormSchema = z.object({
+  type: z.enum(['Work', 'Holiday', 'Sick', 'Training', 'Off']),
+  startTime: z.string().optional(),
+  endTime: z.string().optional(),
+  room: z.string().optional(),
+});
+type ShiftFormInput = z.infer<typeof shiftFormSchema>;
+
+// Best-effort parse of an existing free-text day value back into form fields.
+function parseDayValue(value: string): ShiftFormInput {
+  const v = value.trim();
+  if (!v) return { type: 'Work', startTime: '08:00', endTime: '17:00', room: '' };
+  const variant = shiftVariant(v);
+  if (variant !== 'success') {
+    const type =
+      variant === 'info'
+        ? 'Holiday'
+        : variant === 'danger'
+          ? 'Sick'
+          : variant === 'warning'
+            ? 'Training'
+            : 'Off';
+    return { type, startTime: '', endTime: '', room: '' };
+  }
+  const [times, room] = v.split('·').map((p) => p.trim());
+  const [startTime = '08:00', endTime = '17:00'] = (times ?? '').split('-').map((p) => p.trim());
+  return { type: 'Work', startTime, endTime, room: room ?? '' };
+}
+
+function composeDayValue(d: ShiftFormInput): string {
+  if (d.type !== 'Work') return d.type;
+  const times = [d.startTime, d.endTime].filter(Boolean).join('-');
+  return [times, d.room?.trim()].filter(Boolean).join(' · ');
+}
+
+function ShiftModal({
+  target,
   weekStart,
-  submitting,
-  onSubmit,
-  onCancel,
+  existing,
+  onClose,
+  onDelete,
 }: {
-  editing: RotaRow | null;
+  target: CellTarget;
   weekStart: string;
-  submitting: boolean;
-  onSubmit: (data: RotaFormInput) => void;
-  onCancel: () => void;
+  existing: RotaRow | null;
+  onClose: () => void;
+  onDelete: (id: number) => void;
 }) {
+  const upsertRota = useUpsertRota();
+  const initial = useMemo(
+    () => parseDayValue(existing?.[target.day] ?? ''),
+    [existing, target.day],
+  );
+
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
-  } = useForm<RotaFormInput>({
-    resolver: zodResolver(rotaFormSchema),
-    defaultValues: {
-      staffName: editing?.staff_name ?? '',
-      weekStart,
-      mon: editing?.mon ?? '',
-      tue: editing?.tue ?? '',
-      wed: editing?.wed ?? '',
-      thu: editing?.thu ?? '',
-      fri: editing?.fri ?? '',
-    },
+  } = useForm<ShiftFormInput>({
+    resolver: zodResolver(shiftFormSchema),
+    defaultValues: initial,
   });
 
+  const type = watch('type');
+  const isWork = type === 'Work';
+
+  const onSubmit = (data: ShiftFormInput) => {
+    // Merge: preserve the other days on this staff member's week row.
+    const dayValues: Partial<Record<Weekday, string>> = {};
+    for (const d of WEEKDAYS) dayValues[d] = existing?.[d] ?? '';
+    dayValues[target.day] = composeDayValue(data);
+
+    upsertRota.mutate(
+      { staffName: target.staffName, weekStart, ...dayValues },
+      { onSuccess: onClose },
+    );
+  };
+
   return (
-    <form
-      onSubmit={handleSubmit(onSubmit)}
-      className="space-y-4 rounded-xl border border-border bg-surface p-4"
-    >
-      <div className="text-sm font-medium text-gray-700">
-        {editing ? `Edit ${editing.staff_name}` : 'Add staff member'}
-      </div>
-      <div className="grid grid-cols-6 gap-3">
-        <Field label="Staff name" error={errors.staffName?.message}>
-          <input {...register('staffName')} className="input" />
-        </Field>
-        {DAYS.map((d) => (
-          <Field key={d} label={DAY_LABELS[d]}>
-            <input {...register(d)} className="input" placeholder="e.g. 8–4" />
-          </Field>
-        ))}
-      </div>
-      <div className="flex justify-end gap-2">
-        {editing && (
+    <Modal
+      open
+      onClose={onClose}
+      title={`${existing?.[target.day] ? 'Edit' : 'Add'} shift — ${target.staffName} · ${DAY_LABELS[target.day]}`}
+      footer={
+        <div className="flex justify-end gap-2">
+          {existing && (
+            <button
+              type="button"
+              className="btn-outline btn-sm text-danger"
+              onClick={() => onDelete(existing.id)}
+            >
+              Delete week
+            </button>
+          )}
           <button
-            type="button"
-            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            onClick={onCancel}
+            type="submit"
+            form="shift-form"
+            className="btn-primary"
+            disabled={upsertRota.isPending}
           >
-            Cancel
+            {upsertRota.isPending ? 'Saving…' : 'Save'}
           </button>
+        </div>
+      }
+    >
+      <form id="shift-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <p className="text-xs text-muted">Week beginning {fmtDateUK(weekStart)}</p>
+
+        <Field label="Type" error={errors.type?.message}>
+          <select className="input" {...register('type')}>
+            {['Work', 'Holiday', 'Sick', 'Training', 'Off'].map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        {isWork && (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Start time">
+                <input type="time" className="input" {...register('startTime')} />
+              </Field>
+              <Field label="End time">
+                <input type="time" className="input" {...register('endTime')} />
+              </Field>
+            </div>
+            <Field label="Room">
+              <input className="input" placeholder="e.g. Sunflower, All" {...register('room')} />
+            </Field>
+          </>
         )}
-        <button type="submit" className="btn-primary" disabled={submitting}>
-          {submitting ? 'Saving…' : editing ? 'Save' : 'Add'}
-        </button>
-      </div>
-    </form>
+
+        {/* TODO: needs a structured shift model to capture per-shift Notes
+            (the reference has a Notes field). The current free-text day column
+            has no room for it without polluting the displayed value. */}
+      </form>
+    </Modal>
   );
 }

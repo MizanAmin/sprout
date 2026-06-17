@@ -74,7 +74,7 @@ export function useCreateEnquiry() {
 export function useUpdateEnquiry(id: number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (data: EnquiryCreateInput) => api.patch<Enquiry>(`/enquiries/${id}`, data),
+    mutationFn: (data: Partial<EnquiryCreateInput>) => api.patch<Enquiry>(`/enquiries/${id}`, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: enquiryKeys.all }),
   });
 }

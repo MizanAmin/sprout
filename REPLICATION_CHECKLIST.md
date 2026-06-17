@@ -21,14 +21,14 @@ Legend: ✅ matches · 🟡 exists, needs re-skin/feature pass · ⬜ not starte
 |---|------|-------|--------|
 | 1 | Dashboard | `/dashboard` | ✅ |
 | 2 | Children | `/children` | ✅ |
-| 3 | Relatives | `/relatives` | 🟡 |
+| 3 | Relatives | `/relatives` | ✅ |
 | 4 | Staff | `/staff` | ✅ |
-| 5 | Enquiries | `/enquiries` | 🟡 |
-| 6 | Waiting List | `/waiting-list` | 🟡 |
-| 7 | Consent Forms | `/consents` | 🟡 |
+| 5 | Enquiries | `/enquiries` | ✅ |
+| 6 | Waiting List | `/waiting-list` | ✅ |
+| 7 | Consent Forms | `/consents` | ✅ |
 | 8 | Messages | `/messages` | ✅ |
 | 9 | Rooms | `/rooms` | ✅ |
-| 10 | Staff Rota | `/rota` | 🟡 |
+| 10 | Staff Rota | `/rota` | ✅ |
 | 11 | Sessions & Funding | `/sessions` | 🟡 |
 | 12 | Planning | `/planning` | 🟡 |
 | 13 | Monitoring | `/monitoring` | 🟡 |

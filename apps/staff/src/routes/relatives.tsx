@@ -16,10 +16,44 @@ export const Route = createFileRoute('/relatives')({
   component: RelativesPage,
 });
 
-interface Group {
-  key: string;
-  label: string;
-  relatives: Relative[];
+// ── Avatar helpers (mirrors reference app's `clr` / `ini`) ──────────────
+// Stable gradient picked from a hash of the first two character codes.
+const AVATAR_GRADIENTS = [
+  'linear-gradient(135deg,#4f46e5,#818cf8)',
+  'linear-gradient(135deg,#059669,#34d399)',
+  'linear-gradient(135deg,#d97706,#fbbf24)',
+  'linear-gradient(135deg,#dc2626,#f87171)',
+  'linear-gradient(135deg,#7c3aed,#a78bfa)',
+  'linear-gradient(135deg,#0891b2,#22d3ee)',
+  'linear-gradient(135deg,#ea580c,#fb923c)',
+  'linear-gradient(135deg,#db2777,#f472b6)',
+];
+
+function avatarGradient(name: string): string {
+  const a = name.charCodeAt(0) || 0;
+  const b = name.charCodeAt(1) || 0;
+  return AVATAR_GRADIENTS[(a + b) % AVATAR_GRADIENTS.length];
+}
+
+function initials(name: string): string {
+  return name
+    .split(' ')
+    .map((p) => p[0])
+    .filter(Boolean)
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+function RelativeAvatar({ name }: { name: string }) {
+  return (
+    <div
+      className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl text-xs font-bold text-white"
+      style={{ backgroundImage: avatarGradient(name) }}
+    >
+      {initials(name)}
+    </div>
+  );
 }
 
 function RelativesPage() {
@@ -28,37 +62,24 @@ function RelativesPage() {
   const createRelative = useCreateRelative();
   const deleteRelative = useDeleteRelative();
 
+  const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<Relative | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
+  // child_id → name, for the "Linked child" column.
   const childName = useMemo(() => {
     const map = new Map<number, string>();
     for (const c of children ?? []) map.set(c.id, c.name);
     return map;
   }, [children]);
 
-  // Group relatives by their child; unassigned relatives go in their own group.
-  const groups = useMemo<Group[]>(() => {
-    const byChild = new Map<string, Relative[]>();
-    for (const r of relatives ?? []) {
-      const key = r.child_id == null ? 'unassigned' : String(r.child_id);
-      const list = byChild.get(key) ?? [];
-      list.push(r);
-      byChild.set(key, list);
-    }
-    return Array.from(byChild.entries())
-      .map(([key, list]) => ({
-        key,
-        label:
-          key === 'unassigned' ? 'Unassigned' : childName.get(Number(key)) ?? `Child #${key}`,
-        relatives: list,
-      }))
-      .sort((a, b) => {
-        if (a.key === 'unassigned') return 1;
-        if (b.key === 'unassigned') return -1;
-        return a.label.localeCompare(b.label);
-      });
-  }, [relatives, childName]);
+  const filtered = useMemo(
+    () =>
+      (relatives ?? []).filter(
+        (r) => !search || r.name.toLowerCase().includes(search.toLowerCase()),
+      ),
+    [relatives, search],
+  );
 
   const openAdd = () => {
     setEditing(null);
@@ -78,62 +99,90 @@ function RelativesPage() {
         </button>
       </div>
 
+      <div className="flex flex-wrap gap-3">
+        <input
+          className="input max-w-xs"
+          placeholder="Search by name…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
       {isLoading ? (
         <Spinner />
-      ) : groups.length === 0 ? (
-        <EmptyState title="No relatives found" description="Add a relative to get started." />
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          title="No relatives yet"
+          description="Add parents and emergency contacts so families can be linked to children."
+        />
       ) : (
-        <div className="space-y-6">
-          {groups.map((g) => (
-            <div key={g.key} className="space-y-2">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
-                {g.label}
-              </h2>
-              <div className="overflow-hidden rounded-xl border border-border bg-surface">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-gray-50 text-muted">
-                    <tr>
-                      <th className="px-4 py-2 font-medium">Name</th>
-                      <th className="px-4 py-2 font-medium">Relation</th>
-                      <th className="px-4 py-2 font-medium">Phone</th>
-                      <th className="px-4 py-2 font-medium">Email</th>
-                      <th className="px-4 py-2 font-medium">Flags</th>
-                      <th className="px-4 py-2 font-medium text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {g.relatives.map((r) => (
-                      <tr key={r.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-2 font-medium text-gray-900">{r.name}</td>
-                        <td className="px-4 py-2">{r.relation || '—'}</td>
-                        <td className="px-4 py-2">{r.phone || '—'}</td>
-                        <td className="px-4 py-2">{r.email || '—'}</td>
-                        <td className="px-4 py-2">
-                          <div className="flex flex-wrap gap-1">
-                            {r.is_primary_contact && <Badge variant="info">Primary</Badge>}
-                            {r.is_emergency_contact && <Badge variant="warning">Emergency</Badge>}
-                          </div>
-                        </td>
-                        <td className="px-4 py-2 text-right">
-                          <button className="text-sm text-primary" onClick={() => openEdit(r)}>
-                            Edit
-                          </button>
-                          <button
-                            className="ml-3 text-sm text-danger"
-                            onClick={() => {
-                              if (confirm(`Delete ${r.name}?`)) deleteRelative.mutate(r.id);
-                            }}
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ))}
+        <div className="overflow-hidden rounded-xl border border-border bg-surface">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-gray-50 text-muted">
+              <tr>
+                <th className="px-4 py-2 font-medium">Name</th>
+                <th className="px-4 py-2 font-medium">Relationship</th>
+                <th className="px-4 py-2 font-medium">Linked child</th>
+                <th className="px-4 py-2 font-medium">Phone</th>
+                <th className="px-4 py-2 font-medium">Email</th>
+                <th className="px-4 py-2 font-medium">Access</th>
+                <th className="px-4 py-2 text-right font-medium">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {filtered.map((r) => (
+                <tr key={r.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-2">
+                    <div className="flex items-center gap-3">
+                      <RelativeAvatar name={r.name} />
+                      <span className="font-semibold text-gray-900">{r.name}</span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-2">
+                    {r.relation ? (
+                      <Badge variant="info">{r.relation}</Badge>
+                    ) : (
+                      <span className="text-muted">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2">
+                    {r.child_id != null ? (
+                      childName.get(r.child_id) ?? `Child #${r.child_id}`
+                    ) : (
+                      <span className="text-muted">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2">{r.phone || <span className="text-muted">—</span>}</td>
+                  <td className="px-4 py-2">{r.email || <span className="text-muted">—</span>}</td>
+                  <td className="px-4 py-2">
+                    <div className="flex flex-wrap gap-1">
+                      {r.is_primary_contact && <Badge variant="success">Primary</Badge>}
+                      {r.is_emergency_contact && <Badge variant="warning">Emergency</Badge>}
+                      {!r.is_primary_contact && !r.is_emergency_contact && (
+                        <span className="text-muted">—</span>
+                      )}
+                      {/* TODO: needs a portal-access field on the relatives row (e.g.
+                          has_portal_access / portal_user_id) to render a portal/parent
+                          login badge as the reference app does. Not in the current schema. */}
+                    </div>
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    <button className="text-sm text-primary" onClick={() => openEdit(r)}>
+                      Edit
+                    </button>
+                    <button
+                      className="ml-3 text-sm text-danger"
+                      onClick={() => {
+                        if (confirm(`Delete ${r.name}?`)) deleteRelative.mutate(r.id);
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -167,11 +216,7 @@ function RelativeModal({
 }) {
   const updateRelative = useUpdateRelative(editing?.id ?? 0);
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title={editing ? `Edit ${editing.name}` : 'Add relative'}
-    >
+    <Modal open={open} onClose={onClose} title={editing ? `Edit ${editing.name}` : 'Add relative'}>
       <RelativeForm
         initial={editing ?? undefined}
         children={children}
