@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { AssessmentCreateInput } from '@sprout/schemas';
+import type { AssessmentCreateInput, AssessmentUpdateInput } from '@sprout/schemas';
 import { api } from '../../api';
 
 // Assessment row as returned by the API (snake_case from the DB).
@@ -43,6 +43,15 @@ export function useCreateAssessment() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: AssessmentCreateInput) => api.post<Assessment>('/assessments', data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: assessmentKeys.all }),
+  });
+}
+
+export function useUpdateAssessment(id: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: AssessmentUpdateInput) =>
+      api.patch<Assessment>(`/assessments/${id}`, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: assessmentKeys.all }),
   });
 }

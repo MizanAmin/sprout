@@ -29,13 +29,13 @@ Legend: ✅ matches · 🟡 exists, needs re-skin/feature pass · ⬜ not starte
 | 8 | Messages | `/messages` | ✅ |
 | 9 | Rooms | `/rooms` | ✅ |
 | 10 | Staff Rota | `/rota` | ✅ |
-| 11 | Sessions & Funding | `/sessions` | 🟡 |
-| 12 | Planning | `/planning` | 🟡 |
-| 13 | Monitoring | `/monitoring` | 🟡 |
+| 11 | Sessions & Funding | `/sessions` | ✅ |
+| 12 | Planning | `/planning` | ✅ |
+| 13 | Monitoring | `/monitoring` | ✅ |
 | 14 | Live Register | `/register` | ✅ |
 | 15 | Fire Register | `/fire-register` | 🟡 |
-| 16 | Calendar | `/calendar` | 🟡 |
-| 17 | Assessment | `/assessment` | 🟡 |
+| 16 | Calendar | `/calendar` | ✅ |
+| 17 | Assessment | `/assessment` | ✅ |
 | 18 | Daily Logs | `/daily-logs` | ✅ |
 | 19 | Learning Journal | `/journal` | ✅ |
 | 20 | Reflections | `/reflections` | 🟡 |
