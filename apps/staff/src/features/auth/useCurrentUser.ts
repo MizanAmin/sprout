@@ -3,11 +3,21 @@ import { supabase } from '@sprout/db';
 
 export type Role = 'manager' | 'staff' | 'parent';
 
+export type Plan = 'seedling' | 'blossom' | 'grove' | 'forest';
+const PLAN_ORDER: Plan[] = ['seedling', 'blossom', 'grove', 'forest'];
+
+/** True if `plan` is at least `min` in the tier order. */
+export function planAtLeast(plan: Plan | undefined, min: Plan): boolean {
+  if (!plan) return false;
+  return PLAN_ORDER.indexOf(plan) >= PLAN_ORDER.indexOf(min);
+}
+
 export interface CurrentUser {
   id: string;
   name: string;
   role: Role;
   nurseryId: number;
+  plan: Plan;
 }
 
 // Reads the signed-in user's custom claims (role, nursery_id, name) from the
@@ -20,7 +30,7 @@ export function useCurrentUser(): CurrentUser | null {
     type Sess = Awaited<ReturnType<typeof supabase.auth.getSession>>['data']['session'];
     const read = (session: Sess) => {
       const m = session?.user?.user_metadata as
-        | { name?: string; role?: Role; nursery_id?: number | string }
+        | { name?: string; role?: Role; nursery_id?: number | string; plan?: Plan }
         | undefined;
       if (!session || !m) {
         setUser(null);
@@ -31,6 +41,7 @@ export function useCurrentUser(): CurrentUser | null {
         name: m.name ?? '',
         role: (m.role ?? 'staff') as Role,
         nurseryId: Number(m.nursery_id),
+        plan: (m.plan ?? 'seedling') as Plan,
       });
     };
     supabase.auth.getSession().then(({ data }) => read(data.session));

@@ -10,6 +10,7 @@ export interface CalendarEvent {
   end_date: string | null;
   all_day: boolean;
   color: string;
+  event_type: string;
   description: string | null;
   created_by: string | null;
 }
@@ -21,6 +22,7 @@ export interface CalendarEventInput {
   endDate?: string;
   allDay?: boolean;
   color?: string;
+  eventType?: string;
   description?: string;
   createdBy?: string;
 }

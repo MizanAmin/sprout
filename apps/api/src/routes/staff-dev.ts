@@ -24,6 +24,9 @@ const TRAINING_COLS: Record<string, string> = {
   expiryDate: 'expiry_date',
   certificateUrl: 'certificate_url',
   status: 'status',
+  hours: 'hours',
+  trainingType: 'training_type',
+  notes: 'notes',
 };
 
 const trainingCreateSchema = z.object({
@@ -35,6 +38,9 @@ const trainingCreateSchema = z.object({
   expiryDate: z.string().optional(),
   certificateUrl: z.string().optional(),
   status: z.enum(['planned', 'completed', 'expired']).optional(),
+  hours: z.number().optional(),
+  trainingType: z.string().optional(),
+  notes: z.string().optional(),
 });
 
 const trainingUpdateSchema = trainingCreateSchema.partial();
@@ -72,8 +78,8 @@ app.post('/training', zValidator('json', trainingCreateSchema), async (c) => {
   const { rows } = await withTenant(nurseryId, (client) =>
     client.query(
       `INSERT INTO staff_training
-         (nursery_id, staff_id, staff_name, course_name, provider, completed_date, expiry_date, certificate_url, status)
-       VALUES ($1,$2,COALESCE($3,''),$4,COALESCE($5,''),$6,$7,COALESCE($8,''),COALESCE($9,'completed'))
+         (nursery_id, staff_id, staff_name, course_name, provider, completed_date, expiry_date, certificate_url, status, hours, training_type, notes)
+       VALUES ($1,$2,COALESCE($3,''),$4,COALESCE($5,''),$6,$7,COALESCE($8,''),COALESCE($9,'completed'),$10,COALESCE($11,''),COALESCE($12,''))
        RETURNING *`,
       [
         nurseryId,
@@ -85,6 +91,9 @@ app.post('/training', zValidator('json', trainingCreateSchema), async (c) => {
         b.expiryDate ?? null,
         b.certificateUrl ?? null,
         b.status ?? null,
+        b.hours ?? null,
+        b.trainingType ?? null,
+        b.notes ?? null,
       ],
     ),
   );
@@ -140,6 +149,8 @@ const APPRAISAL_COLS: Record<string, string> = {
   areasForDev: 'areas_for_dev',
   targets: 'targets',
   nextReview: 'next_review',
+  period: 'period',
+  overallRating: 'overall_rating',
 };
 
 const appraisalCreateSchema = z.object({
@@ -151,6 +162,8 @@ const appraisalCreateSchema = z.object({
   areasForDev: z.string().optional(),
   targets: z.string().optional(),
   nextReview: z.string().optional(),
+  period: z.string().optional(),
+  overallRating: z.string().optional(),
 });
 
 const appraisalUpdateSchema = appraisalCreateSchema.partial();
@@ -181,8 +194,8 @@ app.post('/appraisals', zValidator('json', appraisalCreateSchema), async (c) => 
   const { rows } = await withTenant(nurseryId, (client) =>
     client.query(
       `INSERT INTO staff_appraisals
-         (nursery_id, staff_id, staff_name, date, appraiser, strengths, areas_for_dev, targets, next_review)
-       VALUES ($1,$2,COALESCE($3,''),COALESCE($4,CURRENT_DATE),COALESCE($5,''),COALESCE($6,''),COALESCE($7,''),COALESCE($8,''),$9)
+         (nursery_id, staff_id, staff_name, date, appraiser, strengths, areas_for_dev, targets, next_review, period, overall_rating)
+       VALUES ($1,$2,COALESCE($3,''),COALESCE($4,CURRENT_DATE),COALESCE($5,''),COALESCE($6,''),COALESCE($7,''),COALESCE($8,''),$9,COALESCE($10,''),COALESCE($11,''))
        RETURNING *`,
       [
         nurseryId,
@@ -194,6 +207,8 @@ app.post('/appraisals', zValidator('json', appraisalCreateSchema), async (c) => 
         b.areasForDev ?? null,
         b.targets ?? null,
         b.nextReview ?? null,
+        b.period ?? null,
+        b.overallRating ?? null,
       ],
     ),
   );

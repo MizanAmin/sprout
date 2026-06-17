@@ -36,6 +36,17 @@ const FORM_STATUS_VARIANT: Record<ConsentFormStatus, 'warning' | 'success' | 'da
 
 const ukDate = (s: string | null) =>
   s ? new Date(s).toLocaleDateString('en-GB') : '—';
+
+// A form is overdue when it is still awaiting signature (pending) and its
+// due_date is strictly before today.
+const isOverdue = (f: ConsentForm) => {
+  if (f.status !== 'pending' || !f.due_date) return false;
+  const due = new Date(f.due_date);
+  if (Number.isNaN(due.getTime())) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return due < today;
+};
 const ukDateTime = (s: string | null) =>
   s
     ? new Date(s).toLocaleString('en-GB', {
@@ -66,15 +77,15 @@ function ConsentsPage() {
 
   const deleteTemplate = useDeleteConsentTemplate();
 
-  // KPI counts. The reference also shows "overdue", but Sprout's consent_forms
-  // has no due_date column, so that card is omitted.
-  // TODO: needs a due_date column on consent_forms to compute overdue counts.
+  // KPI counts. "Overdue" = a form still awaiting signature (pending) whose
+  // due_date is in the past.
   const counts = useMemo(() => {
     const all = forms ?? [];
     return {
       pending: all.filter((f) => f.status === 'pending').length,
       signed: all.filter((f) => f.status === 'signed').length,
       declined: all.filter((f) => f.status === 'declined').length,
+      overdue: all.filter((f) => isOverdue(f)).length,
     };
   }, [forms]);
 
@@ -103,8 +114,9 @@ function ConsentsPage() {
       <h1 className="text-2xl font-semibold text-gray-900">Consent Forms</h1>
 
       {/* KPI summary */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         <StatCard label="Awaiting signature" value={counts.pending} />
+        <StatCard label="Overdue" value={counts.overdue} />
         <StatCard label="Signed" value={counts.signed} />
         <StatCard label="Declined" value={counts.declined} />
         <StatCard label="Templates" value={(templates ?? []).length} />
@@ -223,9 +235,8 @@ function TemplateCard({
               {t.active ? 'Active' : 'Inactive'}
             </Badge>
             <Badge variant="info">v{t.version}</Badge>
-            {/* The reference shows a "Requires signature" / category badge, but
-                Sprout's consent_templates has only title/body/version/active.
-                TODO: needs requires_signature + category columns on consent_templates. */}
+            {t.category && <Badge variant="muted">{t.category}</Badge>}
+            {t.requires_signature && <Badge variant="warning">Signature required</Badge>}
           </div>
         </div>
       </div>
@@ -257,6 +268,7 @@ function SentFormsTable({ forms }: { forms: ConsentForm[] }) {
           <tr>
             <th className="px-4 py-2 font-medium">Child</th>
             <th className="px-4 py-2 font-medium">Status</th>
+            <th className="px-4 py-2 font-medium">Due</th>
             <th className="px-4 py-2 font-medium">Signed by</th>
             <th className="px-4 py-2 font-medium">Signed at</th>
             <th className="px-4 py-2 font-medium">Issued</th>
@@ -269,6 +281,12 @@ function SentFormsTable({ forms }: { forms: ConsentForm[] }) {
               <td className="px-4 py-2 font-medium text-gray-900">{f.child_name || '—'}</td>
               <td className="px-4 py-2">
                 <Badge variant={FORM_STATUS_VARIANT[f.status]}>{f.status}</Badge>
+              </td>
+              <td className="px-4 py-2 text-muted">
+                <span className="flex items-center gap-1.5">
+                  {ukDate(f.due_date)}
+                  {isOverdue(f) && <Badge variant="danger">Overdue</Badge>}
+                </span>
               </td>
               <td className="px-4 py-2">{f.signed_by || '—'}</td>
               <td className="px-4 py-2 text-muted">{ukDateTime(f.signed_at)}</td>
@@ -353,8 +371,15 @@ function TemplateForm({
   } = useForm<ConsentTemplateCreateInput>({
     resolver: zodResolver(consentTemplateCreateSchema),
     defaultValues: initial
-      ? { title: initial.title, body: initial.body, version: initial.version, active: initial.active }
-      : { active: true },
+      ? {
+          title: initial.title,
+          body: initial.body,
+          version: initial.version,
+          active: initial.active,
+          requiresSignature: initial.requires_signature,
+          category: initial.category ?? '',
+        }
+      : { active: true, requiresSignature: true },
   });
 
   return (
@@ -369,6 +394,13 @@ function TemplateForm({
       <Field label="Version" error={errors.version?.message}>
         <input {...register('version')} placeholder="1.0" className="input" />
       </Field>
+      <Field label="Category" error={errors.category?.message}>
+        <input
+          {...register('category')}
+          placeholder="e.g. Medical, Outings, Media"
+          className="input"
+        />
+      </Field>
       <Field label="Form body" error={errors.body?.message}>
         <textarea
           {...register('body')}
@@ -380,6 +412,10 @@ function TemplateForm({
       <label className="flex items-center gap-2 text-sm text-gray-700">
         <input type="checkbox" {...register('active')} />
         Active
+      </label>
+      <label className="flex items-center gap-2 text-sm text-gray-700">
+        <input type="checkbox" {...register('requiresSignature')} />
+        Requires signature
       </label>
       <div className="flex justify-end">
         <button type="submit" className="btn-primary" disabled={submitting}>
@@ -463,6 +499,9 @@ function IssueFormModal({
         </Field>
         <Field label="Child name (optional override)" error={errors.childName?.message}>
           <input {...register('childName')} className="input" />
+        </Field>
+        <Field label="Due date" error={errors.dueDate?.message}>
+          <input type="date" {...register('dueDate')} className="input" />
         </Field>
         <Field label="Status" error={errors.status?.message}>
           <select {...register('status')} className="input">

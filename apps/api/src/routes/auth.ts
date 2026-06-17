@@ -48,7 +48,7 @@ app.post('/register-nursery', zValidator('json', registerSchema), async (c) => {
     email,
     password,
     email_confirm: true,
-    user_metadata: { nursery_id: nurseryId, role: 'manager', name, child_ids: [] },
+    user_metadata: { nursery_id: nurseryId, role: 'manager', name, child_ids: [], plan: 'seedling' },
   });
   if (error || !data?.user) {
     // Best-effort rollback of the orphaned nursery so a retry can reuse the email.

@@ -15,12 +15,10 @@ export const Route = createFileRoute('/calendar')({
 });
 
 // ── Event types ──────────────────────────────────────────────────────────────
-// The reference app keys events off an `event_type` column. The Sprout API
-// (apps/api/src/routes/calendar.ts) has no such column — only `color`. So we
-// treat `color` as the source of truth for the type: selecting a type writes its
-// canonical colour, and rendering maps the stored colour back to the type meta.
-// TODO: needs an `event_type` column on calendar_events (+ API + schema) for a
-// robust mapping; until then two types sharing a colour can't be distinguished.
+// `event_type` (on calendar_events) is the source of truth for an event's type.
+// Selecting a type writes its `event_type` plus the canonical colour, and
+// rendering keys off `event.event_type`. Older rows without an `event_type`
+// fall back to mapping the stored colour back to a type.
 
 type EventTypeKey = 'closure' | 'bank_holiday' | 'event' | 'term_date' | 'inset_day';
 
@@ -50,15 +48,19 @@ const COLOR_TO_TYPE: Record<string, EventTypeKey> = Object.fromEntries(
   TYPE_ORDER.map((k) => [CAL_TYPE_META[k].color.toLowerCase(), k]),
 ) as Record<string, EventTypeKey>;
 
-function metaFor(e: CalendarEvent): TypeMeta {
-  const key = COLOR_TO_TYPE[(e.color || '').toLowerCase()];
-  if (key) return CAL_TYPE_META[key];
-  // Unknown colour → fall back to the stored colour with the generic event icon.
-  return { ...CAL_TYPE_META.event, color: e.color || CAL_TYPE_META.event.color };
+// `event_type` is the source of truth; fall back to colour mapping for old rows.
+function typeKeyFor(e: CalendarEvent): EventTypeKey | null {
+  if (e.event_type && e.event_type in CAL_TYPE_META) {
+    return e.event_type as EventTypeKey;
+  }
+  return COLOR_TO_TYPE[(e.color || '').toLowerCase()] ?? null;
 }
 
-function typeKeyFor(e: CalendarEvent): EventTypeKey {
-  return COLOR_TO_TYPE[(e.color || '').toLowerCase()] ?? 'event';
+function metaFor(e: CalendarEvent): TypeMeta {
+  const key = typeKeyFor(e);
+  if (key) return CAL_TYPE_META[key];
+  // Unknown type/colour → fall back to the stored colour with the generic event icon.
+  return { ...CAL_TYPE_META.event, color: e.color || CAL_TYPE_META.event.color };
 }
 
 // ── Date helpers (all ISO yyyy-mm-dd, all-day events) ─────────────────────────
@@ -504,7 +506,7 @@ function CalendarForm({
   const [description, setDescription] = useState('');
 
   useEffect(() => {
-    const t = initial ? typeKeyFor(initial) : 'event';
+    const t = (initial ? typeKeyFor(initial) : null) ?? 'event';
     setTitle(initial?.title ?? '');
     setType(t);
     setColor(initial?.color ?? CAL_TYPE_META[t].color);
@@ -513,7 +515,7 @@ function CalendarForm({
     setDescription(initial?.description ?? '');
   }, [initial, prefillDate]);
 
-  // Selecting a type writes its canonical colour (the type's source of truth).
+  // Selecting a type sets `eventType` (source of truth) and its canonical colour.
   const onTypeChange = (k: EventTypeKey) => {
     setType(k);
     setColor(CAL_TYPE_META[k].color);
@@ -529,6 +531,7 @@ function CalendarForm({
       endDate: end,
       allDay: true,
       color,
+      eventType: type,
       description: description || undefined,
     });
   };

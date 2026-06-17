@@ -1,7 +1,7 @@
 import { createRootRoute, Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 import { supabase } from '@sprout/db';
-import { useCurrentUser } from '../features/auth/useCurrentUser';
+import { useCurrentUser, planAtLeast, type Plan } from '../features/auth/useCurrentUser';
 import { QuickJump } from '../components/QuickJump';
 import { initTheme, isDark, toggleTheme } from '../lib/theme';
 
@@ -11,12 +11,12 @@ type Session = Awaited<ReturnType<typeof supabase.auth.getSession>>['data']['ses
 
 // Full navigation. `mgr` items are hidden from non-manager staff (the API also
 // enforces this server-side). Order mirrors the live app's grouping.
-const NAV: { to: string; label: string; mgr?: boolean }[] = [
+const NAV: { to: string; label: string; mgr?: boolean; plan?: Plan }[] = [
   { to: '/dashboard', label: 'Dashboard' },
   { to: '/children', label: 'Children' },
   { to: '/relatives', label: 'Relatives' },
   { to: '/staff', label: 'Staff' },
-  { to: '/staff-dev', label: 'Staff Development', mgr: true },
+  { to: '/staff-dev', label: 'Staff Development', mgr: true, plan: 'blossom' },
   { to: '/enquiries', label: 'Enquiries', mgr: true },
   { to: '/waiting-list', label: 'Waiting List', mgr: true },
   { to: '/consents', label: 'Consent Forms', mgr: true },
@@ -39,7 +39,7 @@ const NAV: { to: string; label: string; mgr?: boolean }[] = [
   { to: '/incidents', label: 'Incidents' },
   { to: '/accident-book', label: 'Accident Book' },
   { to: '/ofsted', label: 'Ofsted Mode', mgr: true },
-  { to: '/compliance', label: 'Compliance Hub', mgr: true },
+  { to: '/compliance', label: 'Compliance Hub', mgr: true, plan: 'blossom' },
   { to: '/gdpr', label: 'GDPR', mgr: true },
   { to: '/invoices', label: 'Invoices', mgr: true },
   { to: '/finance', label: 'Finance', mgr: true },
@@ -90,8 +90,12 @@ function RootShell() {
     navigate({ to: '/login' });
   }
 
-  // Managers see everything; staff get the non-manager subset.
-  const nav = user?.role === 'manager' || !user ? NAV : NAV.filter((n) => !n.mgr);
+  // Hide manager-only items from staff, and plan-gated items below the tier.
+  const nav = NAV.filter((n) => {
+    if (n.mgr && user && user.role !== 'manager') return false;
+    if (n.plan && user && !planAtLeast(user.plan, n.plan)) return false;
+    return true;
+  });
   // Topbar title = the deepest matching nav label.
   const current = [...nav]
     .filter((n) => pathname === n.to || pathname.startsWith(n.to + '/'))

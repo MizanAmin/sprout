@@ -12,6 +12,7 @@ export const observationCreateSchema = z.object({
   isShared: z.boolean().optional(),
   practitioner: z.string().optional(),
   score: z.number().int().min(1).max(5).optional(),
+  nextSteps: z.string().optional(),
 });
 
 export const observationUpdateSchema = observationCreateSchema.partial();

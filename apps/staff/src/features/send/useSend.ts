@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api';
 
+export type SendStatus = 'active' | 'monitoring' | 'resolved';
+
 // SEND flag row as returned by the API (snake_case from the DB, send_flags table).
 export interface SendFlag {
   id: number;
@@ -11,6 +13,7 @@ export interface SendFlag {
   support_plan: string | null;
   review_date: string | null;
   flagged_by: string | null;
+  status: SendStatus;
 }
 
 // Request body matches the route's zValidator schema (camelCase).
@@ -21,6 +24,7 @@ export interface SendInput {
   supportPlan?: string;
   reviewDate?: string;
   flaggedBy?: string;
+  status?: SendStatus;
 }
 
 export const sendKeys = {

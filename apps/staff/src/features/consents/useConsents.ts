@@ -15,6 +15,8 @@ export interface ConsentTemplate {
   body: string;
   version: string;
   active: boolean;
+  requires_signature: boolean;
+  category: string | null;
   created_at: string;
 }
 
@@ -29,6 +31,7 @@ export interface ConsentForm {
   signed_at: string | null;
   signature_data: string;
   status: ConsentFormStatus;
+  due_date: string | null;
   created_at: string;
 }
 

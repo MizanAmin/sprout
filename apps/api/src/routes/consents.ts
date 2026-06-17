@@ -25,6 +25,8 @@ const TEMPLATE_COLS: Record<string, string> = {
   body: 'body',
   version: 'version',
   active: 'active',
+  requiresSignature: 'requires_signature',
+  category: 'category',
 };
 
 app.get('/templates', async (c) => {
@@ -42,10 +44,18 @@ app.post('/templates', zValidator('json', templateCreateSchema), async (c) => {
   const b = c.req.valid('json');
   const { rows } = await withTenant(nurseryId, (client) =>
     client.query(
-      `INSERT INTO consent_templates (nursery_id, title, body, version, active)
-       VALUES ($1,$2,$3,COALESCE($4,'1.0'),COALESCE($5,true))
+      `INSERT INTO consent_templates (nursery_id, title, body, version, active, requires_signature, category)
+       VALUES ($1,$2,$3,COALESCE($4,'1.0'),COALESCE($5,true),COALESCE($6,true),$7)
        RETURNING *`,
-      [nurseryId, b.title, b.body, b.version ?? null, b.active ?? null],
+      [
+        nurseryId,
+        b.title,
+        b.body,
+        b.version ?? null,
+        b.active ?? null,
+        b.requiresSignature ?? null,
+        b.category ?? null,
+      ],
     ),
   );
   return c.json(rows[0], 201);
@@ -98,6 +108,7 @@ const FORM_COLS: Record<string, string> = {
   signedBy: 'signed_by',
   signatureData: 'signature_data',
   status: 'status',
+  dueDate: 'due_date',
 };
 
 app.get('/', async (c) => {
@@ -133,8 +144,8 @@ app.post('/', zValidator('json', formCreateSchema), async (c) => {
   const { rows } = await withTenant(nurseryId, (client) =>
     client.query(
       `INSERT INTO consent_forms
-         (nursery_id, template_id, child_id, child_name, signed_by, signature_data, status)
-       VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7,'pending'))
+         (nursery_id, template_id, child_id, child_name, signed_by, signature_data, status, due_date)
+       VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7,'pending'),$8)
        RETURNING *`,
       [
         nurseryId,
@@ -144,6 +155,7 @@ app.post('/', zValidator('json', formCreateSchema), async (c) => {
         b.signedBy ?? '',
         b.signatureData ?? '',
         b.status ?? null,
+        b.dueDate ?? null,
       ],
     ),
   );

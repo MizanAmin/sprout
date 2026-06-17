@@ -197,10 +197,11 @@ function ObservationCard({
         </div>
       )}
 
-      {/* Next steps — the reference app stores `next_steps`, but the Sprout
-          observations table/schema has no such column yet, so it cannot be
-          shown or edited here. */}
-      {/* TODO: needs `next_steps` column on observations (DB migration + schema + API) */}
+      {obs.next_steps ? (
+        <p className="mt-3 whitespace-pre-wrap text-sm text-gray-700">
+          ⭐ Next step: {obs.next_steps}
+        </p>
+      ) : null}
 
       <div className="mt-3 flex justify-end gap-3">
         <button className="text-sm text-primary" onClick={onEdit}>
@@ -279,6 +280,7 @@ function ObservationForm({
       photoUrl: editing?.photo_url ?? '',
       practitioner: editing?.practitioner ?? '',
       score: editing?.score ?? undefined,
+      nextSteps: editing?.next_steps ?? '',
       isShared: editing?.is_shared ?? false,
     },
   });
@@ -376,8 +378,9 @@ function ObservationForm({
         </Field>
       </div>
 
-      {/* TODO: needs `next_steps` column on observations to capture next-steps
-          planning text in this modal. */}
+      <Field label="Next steps" error={errors.nextSteps?.message}>
+        <textarea {...register('nextSteps')} className="input" rows={3} />
+      </Field>
 
       <label className="flex items-center gap-2 text-sm text-gray-700">
         <input type="checkbox" {...register('isShared')} />

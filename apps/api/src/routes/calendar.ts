@@ -16,6 +16,7 @@ const createSchema = z.object({
   endDate: z.string().optional(),
   allDay: z.boolean().optional(),
   color: z.string().optional(),
+  eventType: z.string().optional(),
   description: z.string().optional(),
   createdBy: z.string().optional(),
 });
@@ -28,6 +29,7 @@ const COLS: Record<string, string> = {
   endDate: 'end_date',
   allDay: 'all_day',
   color: 'color',
+  eventType: 'event_type',
   description: 'description',
   createdBy: 'created_by',
 };
@@ -65,8 +67,8 @@ app.post('/', zValidator('json', createSchema), async (c) => {
   const { rows } = await withTenant(nurseryId, (client) =>
     client.query(
       `INSERT INTO calendar_events
-         (nursery_id, title, start_date, end_date, all_day, color, description, created_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+         (nursery_id, title, start_date, end_date, all_day, color, event_type, description, created_by)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        RETURNING *`,
       [
         nurseryId,
@@ -75,6 +77,7 @@ app.post('/', zValidator('json', createSchema), async (c) => {
         b.endDate ?? null,
         b.allDay ?? true,
         b.color ?? '#4f8ef7',
+        b.eventType ?? 'event',
         b.description ?? null,
         b.createdBy ?? name,
       ],

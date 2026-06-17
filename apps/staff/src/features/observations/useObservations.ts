@@ -15,6 +15,7 @@ export interface Observation {
   is_shared: boolean;
   practitioner: string;
   score: number | null;
+  next_steps: string;
   created_at: string;
 }
 

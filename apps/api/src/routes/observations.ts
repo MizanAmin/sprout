@@ -23,6 +23,7 @@ const COLS: Record<string, string> = {
   isShared: 'is_shared',
   practitioner: 'practitioner',
   score: 'score',
+  nextSteps: 'next_steps',
 };
 
 app.get('/', async (c) => {
@@ -55,8 +56,8 @@ app.post('/', zValidator('json', observationCreateSchema), async (c) => {
   const { rows } = await withTenant(nurseryId, (client) =>
     client.query(
       `INSERT INTO observations
-         (nursery_id, child_id, child_name, obs_date, areas, text, photo_url, is_shared, practitioner, score)
-       VALUES ($1,$2,$3,COALESCE($4::date, CURRENT_DATE),$5,$6,$7,$8,$9,$10)
+         (nursery_id, child_id, child_name, obs_date, areas, text, photo_url, is_shared, practitioner, score, next_steps)
+       VALUES ($1,$2,$3,COALESCE($4::date, CURRENT_DATE),$5,$6,$7,$8,$9,$10,$11)
        RETURNING *`,
       [
         nurseryId,
@@ -69,6 +70,7 @@ app.post('/', zValidator('json', observationCreateSchema), async (c) => {
         b.isShared ?? false,
         b.practitioner ?? name,
         b.score ?? null,
+        b.nextSteps ?? '',
       ],
     ),
   );

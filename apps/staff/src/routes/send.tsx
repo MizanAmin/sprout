@@ -7,6 +7,7 @@ import {
   useDeleteSend,
   type SendFlag,
   type SendInput,
+  type SendStatus,
 } from '../features/send/useSend';
 import { useChildren, type Child } from '../features/children/useChildren';
 import { Modal, Field, Spinner, EmptyState, Badge } from '../components/ui';
@@ -43,27 +44,23 @@ function initials(name: string): string {
     .slice(0, 2);
 }
 
-// Review urgency drives the card accent + stat buckets. The send_flags table
-// has no status column (unlike the reference's Active/Monitoring/Resolved), so
-// urgency is derived from review_date instead.
-// TODO: needs a `status` column on send_flags to replicate the reference's
-// Active / Monitoring / Resolved badges and stat grid exactly.
-type Urgency = 'overdue' | 'soon' | 'ok';
+// Status (Active / Monitoring / Resolved) drives the card accent + stat buckets.
+const STATUS_LABEL: Record<SendStatus, string> = {
+  active: 'Active',
+  monitoring: 'Monitoring',
+  resolved: 'Resolved',
+};
 
-function reviewUrgency(reviewDate: string | null): Urgency {
-  if (!reviewDate) return 'ok';
-  const due = new Date(reviewDate);
-  if (Number.isNaN(due.getTime())) return 'ok';
-  const days = Math.floor((due.getTime() - Date.now()) / 86_400_000);
-  if (days < 0) return 'overdue';
-  if (days <= 14) return 'soon';
-  return 'ok';
-}
+const STATUS_ACCENT: Record<SendStatus, string> = {
+  active: 'var(--color-warning, #f59e0b)',
+  monitoring: 'var(--color-info, #3b82f6)',
+  resolved: 'var(--color-success, #22c55e)',
+};
 
-const URGENCY_ACCENT: Record<Urgency, string> = {
-  overdue: 'var(--color-danger, #ef4444)',
-  soon: 'var(--color-warning, #f59e0b)',
-  ok: 'var(--color-success, #22c55e)',
+const STATUS_BADGE: Record<SendStatus, 'warning' | 'info' | 'success'> = {
+  active: 'warning',
+  monitoring: 'info',
+  resolved: 'success',
 };
 
 function SendPage() {
@@ -94,16 +91,17 @@ function SendPage() {
     );
   });
 
-  // Stat buckets keyed on review urgency.
+  // Stat buckets keyed on status.
   const stats = useMemo(() => {
-    let overdue = 0;
-    let soon = 0;
+    let active = 0;
+    let monitoring = 0;
+    let resolved = 0;
     for (const f of flags ?? []) {
-      const u = reviewUrgency(f.review_date);
-      if (u === 'overdue') overdue++;
-      else if (u === 'soon') soon++;
+      if (f.status === 'active') active++;
+      else if (f.status === 'monitoring') monitoring++;
+      else if (f.status === 'resolved') resolved++;
     }
-    return { total: (flags ?? []).length, overdue, soon };
+    return { active, monitoring, resolved };
   }, [flags]);
 
   const openAdd = () => {
@@ -124,45 +122,45 @@ function SendPage() {
         </button>
       </div>
 
-      {/* Stat grid — flagged children / reviews overdue / due soon. */}
+      {/* Stat grid — active / monitoring / resolved. */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="stat-card">
-          <span
-            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl text-lg"
-            style={{ background: 'rgba(79,142,247,.12)' }}
-            aria-hidden
-          >
-            🧩
-          </span>
-          <div>
-            <div className="text-2xl font-semibold text-gray-900">{stats.total}</div>
-            <div className="text-sm text-muted">Flagged children</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <span
-            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl text-lg"
-            style={{ background: 'rgba(239,68,68,.12)' }}
-            aria-hidden
-          >
-            🚨
-          </span>
-          <div>
-            <div className="text-2xl font-semibold text-gray-900">{stats.overdue}</div>
-            <div className="text-sm text-muted">Reviews overdue</div>
-          </div>
-        </div>
         <div className="stat-card">
           <span
             className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl text-lg"
             style={{ background: 'rgba(245,158,11,.12)' }}
             aria-hidden
           >
+            🚩
+          </span>
+          <div>
+            <div className="text-2xl font-semibold text-gray-900">{stats.active}</div>
+            <div className="text-sm text-muted">Active</div>
+          </div>
+        </div>
+        <div className="stat-card">
+          <span
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl text-lg"
+            style={{ background: 'rgba(59,130,246,.12)' }}
+            aria-hidden
+          >
             👁️
           </span>
           <div>
-            <div className="text-2xl font-semibold text-gray-900">{stats.soon}</div>
-            <div className="text-sm text-muted">Reviews due soon</div>
+            <div className="text-2xl font-semibold text-gray-900">{stats.monitoring}</div>
+            <div className="text-sm text-muted">Monitoring</div>
+          </div>
+        </div>
+        <div className="stat-card">
+          <span
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl text-lg"
+            style={{ background: 'rgba(34,197,94,.12)' }}
+            aria-hidden
+          >
+            ✅
+          </span>
+          <div>
+            <div className="text-2xl font-semibold text-gray-900">{stats.resolved}</div>
+            <div className="text-sm text-muted">Resolved</div>
           </div>
         </div>
       </div>
@@ -229,9 +227,9 @@ function SendPage() {
   );
 }
 
-// Flagged-child card: avatar + name/room header, category badge, details,
-// support-plan box, review date + flagged-by footer. Left accent reflects
-// review urgency (mirrors the reference's status-coloured border).
+// Flagged-child card: avatar + name/room header, category + status badges,
+// details, support-plan box, review date + flagged-by footer. Left accent
+// reflects status (Active=amber, Monitoring=info, Resolved=success).
 function SendCard({
   flag: f,
   childName,
@@ -245,9 +243,8 @@ function SendCard({
   onEdit: () => void;
   onDelete: () => void;
 }) {
-  const urgency = reviewUrgency(f.review_date);
   return (
-    <div className="card border-l-4 p-5" style={{ borderLeftColor: URGENCY_ACCENT[urgency] }}>
+    <div className="card border-l-4 p-5" style={{ borderLeftColor: STATUS_ACCENT[f.status] }}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2.5">
           <div
@@ -276,8 +273,9 @@ function SendCard({
         </div>
       </div>
 
-      <div className="mt-3">
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         <Badge variant="info">{f.category}</Badge>
+        <Badge variant={STATUS_BADGE[f.status]}>{STATUS_LABEL[f.status]}</Badge>
       </div>
 
       {f.details && <p className="mt-2 text-sm text-primary">{f.details}</p>}
@@ -296,19 +294,7 @@ function SendCard({
         <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3 text-xs text-muted">
           {f.review_date && (
             <span>
-              Review:{' '}
-              <span
-                className={
-                  urgency === 'overdue'
-                    ? 'font-semibold text-danger'
-                    : urgency === 'soon'
-                      ? 'font-semibold text-warning'
-                      : 'font-medium text-gray-700'
-                }
-              >
-                {f.review_date}
-                {urgency === 'overdue' ? ' (overdue)' : ''}
-              </span>
+              Review: <span className="font-medium text-gray-700">{f.review_date}</span>
             </span>
           )}
           {f.review_date && f.flagged_by && <span aria-hidden>·</span>}
@@ -363,6 +349,7 @@ function SendForm({
   const [supportPlan, setSupportPlan] = useState(initial?.support_plan ?? '');
   const [reviewDate, setReviewDate] = useState(initial?.review_date ?? '');
   const [flaggedBy, setFlaggedBy] = useState(initial?.flagged_by ?? '');
+  const [status, setStatus] = useState<SendStatus>(initial?.status ?? 'active');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -374,6 +361,7 @@ function SendForm({
       supportPlan: supportPlan || undefined,
       reviewDate: reviewDate || undefined,
       flaggedBy: flaggedBy || undefined,
+      status,
     });
   };
 
@@ -434,6 +422,18 @@ function SendForm({
 
       <Field label="Flagged by">
         <input className="input" value={flaggedBy} onChange={(e) => setFlaggedBy(e.target.value)} />
+      </Field>
+
+      <Field label="Status">
+        <select
+          className="input"
+          value={status}
+          onChange={(e) => setStatus(e.target.value as SendStatus)}
+        >
+          <option value="active">Active</option>
+          <option value="monitoring">Monitoring</option>
+          <option value="resolved">Resolved</option>
+        </select>
       </Field>
 
       <div className="flex justify-end">

@@ -64,7 +64,9 @@ function CompliancePage() {
   const { data: policies, isLoading: policiesLoading, error: policiesError } = usePolicies();
   const { data: riskAssessments, isLoading: rasLoading, error: rasError } = useRiskAssessments();
   const { data: training, isLoading: trainingLoading } = useTraining();
+  const [addPolicyOpen, setAddPolicyOpen] = useState(false);
 
+  // After all hooks (rules of hooks) — show the upgrade notice on plan errors.
   if (isPlanError(policiesError) || isPlanError(rasError)) {
     return (
       <div className="space-y-4 p-6">
@@ -73,8 +75,6 @@ function CompliancePage() {
       </div>
     );
   }
-
-  const [addPolicyOpen, setAddPolicyOpen] = useState(false);
 
   const isLoading = policiesLoading || rasLoading || trainingLoading;
 

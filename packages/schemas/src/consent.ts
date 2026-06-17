@@ -7,6 +7,8 @@ export const consentTemplateCreateSchema = z.object({
   body: z.string().min(1, 'Body is required'),
   version: z.string().optional(),
   active: z.boolean().optional(),
+  requiresSignature: z.boolean().optional(),
+  category: z.string().optional(),
 });
 export const consentTemplateUpdateSchema = consentTemplateCreateSchema.partial();
 
@@ -17,6 +19,7 @@ export const consentFormCreateSchema = z.object({
   signedBy: z.string().optional(),
   signatureData: z.string().optional(),
   status: z.enum(['pending', 'signed', 'declined']).optional(),
+  dueDate: z.string().optional(),
 });
 export const consentFormUpdateSchema = consentFormCreateSchema.partial();
 

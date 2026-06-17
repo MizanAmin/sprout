@@ -17,6 +17,7 @@ const createSchema = z.object({
   supportPlan: z.string().optional(),
   reviewDate: z.string().optional(),
   flaggedBy: z.string().optional(),
+  status: z.enum(['active', 'monitoring', 'resolved']).optional(),
 });
 
 const updateSchema = createSchema.partial();
@@ -28,6 +29,7 @@ const COLS: Record<string, string> = {
   supportPlan: 'support_plan',
   reviewDate: 'review_date',
   flaggedBy: 'flagged_by',
+  status: 'status',
 };
 
 app.get('/', async (c) => {
@@ -61,8 +63,8 @@ app.post('/', zValidator('json', createSchema), async (c) => {
   const { rows } = await withTenant(nurseryId, (client) =>
     client.query(
       `INSERT INTO send_flags
-         (nursery_id, child_id, category, details, support_plan, review_date, flagged_by)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)
+         (nursery_id, child_id, category, details, support_plan, review_date, flagged_by, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
        RETURNING *`,
       [
         nurseryId,
@@ -72,6 +74,7 @@ app.post('/', zValidator('json', createSchema), async (c) => {
         b.supportPlan ?? null,
         b.reviewDate ?? null,
         b.flaggedBy ?? name,
+        b.status ?? 'active',
       ],
     ),
   );
