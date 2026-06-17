@@ -32,6 +32,9 @@ android/app/build/
 .env
 .env.*
 !.env.example
+# Staff web app ships PUBLIC client config (publishable key + URLs) so its prod
+# build is zero-config on any static host. Safe to commit; tracked deliberately.
+!apps/staff/.env.production
 
 # Supabase
 supabase/.branches/
