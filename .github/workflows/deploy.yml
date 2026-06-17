@@ -1,8 +1,16 @@
 name: Deploy
 
-# Runs after CI succeeds on main. Each job pings a Railway redeploy webhook;
-# Railway pulls the new commit and rebuilds the corresponding service.
-# Set RAILWAY_WEBHOOK_URL and RAILWAY_STAFF_WEBHOOK_URL as GitHub secrets.
+# Deployment model:
+#   • API (service "sprout") is connected to this GitHub repo in Railway, so
+#     Railway auto-builds + redeploys it on every push to main — no step needed
+#     here for the API.
+#   • The jobs worker (service "worker") is deployed from CI with the Railway
+#     CLI, because it shares the API image (START_FILE=src/worker.ts) rather than
+#     having its own repo connection.
+#
+# Setup: create a Railway *project* token (Project → Settings → Tokens) and add
+# it as the GitHub Actions secret RAILWAY_TOKEN. Without it, the worker step
+# skips and the API still auto-deploys natively.
 on:
   workflow_run:
     workflows: [CI]
@@ -10,16 +18,19 @@ on:
     branches: [main]
 
 jobs:
-  deploy-api:
+  deploy-worker:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
     steps:
-      - name: Trigger Railway API redeploy
-        run: curl -fsSL -X POST "${{ secrets.RAILWAY_WEBHOOK_URL }}"
-
-  deploy-staff:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Trigger Railway staff (static site) redeploy
-        run: curl -fsSL -X POST "${{ secrets.RAILWAY_STAFF_WEBHOOK_URL }}"
+      - uses: actions/checkout@v4
+      - name: Install Railway CLI
+        if: ${{ env.RAILWAY_TOKEN != '' }}
+        run: npm i -g @railway/cli
+      - name: Deploy worker
+        if: ${{ env.RAILWAY_TOKEN != '' }}
+        run: railway up --service worker --detach
+      - name: Skip notice
+        if: ${{ env.RAILWAY_TOKEN == '' }}
+        run: echo "RAILWAY_TOKEN not set — skipping worker deploy (API auto-deploys via Railway's GitHub integration)."
