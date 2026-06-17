@@ -1,0 +1,9 @@
+{
+  // Identifies this directory as a specific Cloudflare Pages project so Wrangler's
+  // v2-build app detection stops erroring on the pnpm workspace root. Use with the
+  // Pages "Root directory" set to apps/staff; pages_build_output_dir is relative to
+  // this file, so ./dist == apps/staff/dist (where the Vite build writes).
+  "name": "sprout-staff",
+  "pages_build_output_dir": "./dist",
+  "compatibility_date": "2024-11-01"
+}
