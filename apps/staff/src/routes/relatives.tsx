@@ -158,12 +158,10 @@ function RelativesPage() {
                     <div className="flex flex-wrap gap-1">
                       {r.is_primary_contact && <Badge variant="success">Primary</Badge>}
                       {r.is_emergency_contact && <Badge variant="warning">Emergency</Badge>}
-                      {!r.is_primary_contact && !r.is_emergency_contact && (
+                      {r.has_portal_access && <Badge variant="success">Portal</Badge>}
+                      {!r.is_primary_contact && !r.is_emergency_contact && !r.has_portal_access && (
                         <span className="text-muted">—</span>
                       )}
-                      {/* TODO: needs a portal-access field on the relatives row (e.g.
-                          has_portal_access / portal_user_id) to render a portal/parent
-                          login badge as the reference app does. Not in the current schema. */}
                     </div>
                   </td>
                   <td className="px-4 py-2 text-right">

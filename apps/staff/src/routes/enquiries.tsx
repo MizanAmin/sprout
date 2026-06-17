@@ -11,6 +11,7 @@ import {
   type EnquiryStatus,
 } from '../features/enquiries/useEnquiries';
 import { EnquiryForm } from '../features/enquiries/EnquiryForm';
+import { useAddFromEnquiry } from '../features/waiting-list/useWaitingList';
 import { Modal, Badge, Spinner, EmptyState, StatCard } from '../components/ui';
 
 export const Route = createFileRoute('/enquiries')({
@@ -196,6 +197,7 @@ function PipelineCard({
 }) {
   const updateEnquiry = useUpdateEnquiry(e.id);
   const deleteEnquiry = useDeleteEnquiry();
+  const addToWaitlist = useAddFromEnquiry();
 
   const idx = STAGES.indexOf(e.status);
   const next = idx >= 0 && idx < STAGES.indexOf('Enrolled') ? STAGES[idx + 1] : undefined;
@@ -248,8 +250,18 @@ function PipelineCard({
             Decline
           </button>
         )}
-        {/* TODO: needs POST /waiting-list/from-enquiry to move an enquiry onto the
-            waiting list (reference enqToWaitingList). Not exposed by the API yet. */}
+        {!isClosed && (
+          <button
+            className="btn-outline btn-sm text-[9px]"
+            onClick={() => {
+              if (confirm(`Add ${e.child_name} to the waiting list?`))
+                addToWaitlist.mutate(e.id);
+            }}
+            disabled={addToWaitlist.isPending}
+          >
+            → Waitlist
+          </button>
+        )}
       </div>
       {isClosed && (
         <button

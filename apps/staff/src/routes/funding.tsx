@@ -15,7 +15,7 @@ import {
   type ClaimInput,
 } from '../features/funding/useFunding';
 import { useChildren } from '../features/children/useChildren';
-import { Modal, Field, Spinner, EmptyState, Badge, StatCard } from '../components/ui';
+import { Modal, Field, Spinner, EmptyState, Badge, StatCard, gbp } from '../components/ui';
 
 export const Route = createFileRoute('/funding')({
   component: FundingPage,
@@ -214,8 +214,11 @@ function FundingPage() {
                   <thead className="border-b border-border text-left text-muted">
                     <tr>
                       <th className="px-4 py-2 font-medium">Child</th>
+                      <th className="px-4 py-2 font-medium">Type</th>
                       <th className="px-4 py-2 font-medium">Claimed</th>
                       <th className="px-4 py-2 font-medium">Expected</th>
+                      <th className="px-4 py-2 font-medium">Amount</th>
+                      <th className="px-4 py-2 font-medium">Received</th>
                       <th className="px-4 py-2 font-medium">Status</th>
                       <th className="px-4 py-2" />
                     </tr>
@@ -224,8 +227,19 @@ function FundingPage() {
                     {claims.map((cl) => (
                       <tr key={cl.id} className="border-b border-border last:border-0">
                         <td className="px-4 py-2 font-medium text-gray-900">{childName(cl)}</td>
+                        <td className="px-4 py-2">
+                          {cl.claim_type ? (
+                            <Badge variant="info">{cl.claim_type}</Badge>
+                          ) : (
+                            <span className="text-muted">—</span>
+                          )}
+                        </td>
                         <td className="px-4 py-2 text-muted">{cl.claimed_hours}</td>
                         <td className="px-4 py-2 text-muted">{cl.expected_hours}</td>
+                        <td className="px-4 py-2 text-muted">
+                          {cl.amount != null ? gbp(Number(cl.amount)) : '—'}
+                        </td>
+                        <td className="px-4 py-2 text-muted">{cl.received_date || '—'}</td>
                         <td className="px-4 py-2">
                           <Badge variant={statusVariant(cl.status)}>{cl.status}</Badge>
                         </td>
@@ -373,6 +387,11 @@ function ClaimModal({
   const [claimedHours, setClaimedHours] = useState('0');
   const [expectedHours, setExpectedHours] = useState('0');
   const [status, setStatus] = useState('draft');
+  const [claimType, setClaimType] = useState('');
+  const [receivedDate, setReceivedDate] = useState('');
+  const [reference, setReference] = useState('');
+  const [amount, setAmount] = useState('');
+  const [notes, setNotes] = useState('');
 
   const [seedKey, setSeedKey] = useState<string>('');
   const key = `${open}-${editing?.id ?? 'new'}`;
@@ -383,6 +402,11 @@ function ClaimModal({
     setClaimedHours(String(editing?.claimed_hours ?? 0));
     setExpectedHours(String(editing?.expected_hours ?? 0));
     setStatus(editing?.status ?? 'draft');
+    setClaimType(editing?.claim_type ?? '');
+    setReceivedDate(editing?.received_date ?? '');
+    setReference(editing?.reference ?? '');
+    setAmount(editing?.amount != null ? String(editing.amount) : '');
+    setNotes(editing?.notes ?? '');
   }
 
   const submitting = editing ? updateClaim.isPending : createClaim.isPending;
@@ -400,6 +424,11 @@ function ClaimModal({
       claimedHours: Number(claimedHours) || 0,
       expectedHours: Number(expectedHours) || 0,
       status,
+      claimType: claimType || undefined,
+      receivedDate: receivedDate || undefined,
+      reference: reference || undefined,
+      notes: notes || undefined,
+      amount: amount === '' ? undefined : Number(amount),
     };
     if (editing) updateClaim.mutate(data, { onSuccess: onClose });
     else createClaim.mutate(data, { onSuccess: onClose });
@@ -437,7 +466,18 @@ function ClaimModal({
             ))}
           </select>
         </Field>
-        {/* TODO: needs claim `type` (LA / TFC) field — not in funding_claims schema (apps/api/src/routes/funding.ts). */}
+        <Field label="Claim type">
+          <select
+            value={claimType}
+            onChange={(e) => setClaimType(e.target.value)}
+            className="input"
+          >
+            <option value="">— Select type —</option>
+            <option value="LA">LA</option>
+            <option value="Tax-Free Childcare">Tax-Free Childcare</option>
+            <option value="Other">Other</option>
+          </select>
+        </Field>
         <div className="grid grid-cols-2 gap-4">
           <Field label="Claimed hours">
             <input
@@ -460,7 +500,43 @@ function ClaimModal({
             />
           </Field>
         </div>
-        {/* TODO: reference also captures received_date / reference / notes / £ amounts — funding_claims is hours-only. */}
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Received date">
+            <input
+              type="date"
+              value={receivedDate}
+              onChange={(e) => setReceivedDate(e.target.value)}
+              className="input"
+            />
+          </Field>
+          <Field label="Amount (£)">
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="input"
+              placeholder="0.00"
+            />
+          </Field>
+        </div>
+        <Field label="Reference">
+          <input
+            value={reference}
+            onChange={(e) => setReference(e.target.value)}
+            className="input"
+            placeholder="e.g. claim reference"
+          />
+        </Field>
+        <Field label="Notes">
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className="input"
+            rows={2}
+          />
+        </Field>
         <Field label="Status">
           <select value={status} onChange={(e) => setStatus(e.target.value)} className="input">
             <option value="draft">draft</option>

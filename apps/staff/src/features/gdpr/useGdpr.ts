@@ -16,6 +16,9 @@ export interface GdprSettings {
   lawful_basis: string;
   last_audit_date: string | null;
   next_audit_date: string | null;
+  ico_registered: boolean;
+  ico_number: string;
+  privacy_notice: string;
 }
 
 export const gdprSettingsSchema = z.object({
@@ -28,6 +31,9 @@ export const gdprSettingsSchema = z.object({
   lawfulBasis: z.string().optional(),
   lastAuditDate: z.string().optional(),
   nextAuditDate: z.string().optional(),
+  icoRegistered: z.boolean().optional(),
+  icoNumber: z.string().optional(),
+  privacyNotice: z.string().optional(),
 });
 export type GdprSettingsInput = z.infer<typeof gdprSettingsSchema>;
 
@@ -210,5 +216,27 @@ export function useDeleteRetention() {
   return useMutation({
     mutationFn: (id: number) => api.delete<{ ok: true }>(`/gdpr/retention/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['gdpr', 'retention'] }),
+  });
+}
+
+// ---- Audit log ----
+
+export interface AuditLogEntry {
+  id: number;
+  nursery_id: number;
+  user_id: string | null;
+  user_name: string | null;
+  action: string;
+  table_name: string | null;
+  record_id: string | null;
+  details: string | null;
+  ip_address: string | null;
+  created_at: string;
+}
+
+export function useAuditLog() {
+  return useQuery({
+    queryKey: ['gdpr', 'audit'],
+    queryFn: () => api.get<AuditLogEntry[]>('/gdpr/audit'),
   });
 }

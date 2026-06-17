@@ -95,6 +95,11 @@ const claimCreateSchema = z.object({
   claimedHours: z.number().nonnegative().optional(),
   expectedHours: z.number().nonnegative().optional(),
   status: z.string().optional(),
+  claimType: z.string().optional(),
+  receivedDate: z.string().optional(),
+  reference: z.string().optional(),
+  notes: z.string().optional(),
+  amount: z.number().optional(),
 });
 const claimUpdateSchema = claimCreateSchema.partial();
 const CLAIM_COLS: Record<string, string> = {
@@ -104,6 +109,11 @@ const CLAIM_COLS: Record<string, string> = {
   claimedHours: 'claimed_hours',
   expectedHours: 'expected_hours',
   status: 'status',
+  claimType: 'claim_type',
+  receivedDate: 'received_date',
+  reference: 'reference',
+  notes: 'notes',
+  amount: 'amount',
 };
 
 app.get('/claims', async (c) => {
@@ -126,8 +136,9 @@ app.post('/claims', zValidator('json', claimCreateSchema), async (c) => {
   const { rows } = await withTenant(nurseryId, (client) =>
     client.query(
       `INSERT INTO funding_claims
-         (nursery_id, funding_period_id, child_id, child_name, claimed_hours, expected_hours, status)
-       VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7,'draft'))
+         (nursery_id, funding_period_id, child_id, child_name, claimed_hours, expected_hours, status,
+          claim_type, received_date, reference, notes, amount)
+       VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7,'draft'),$8,$9,$10,$11,$12)
        RETURNING *`,
       [
         nurseryId,
@@ -137,6 +148,11 @@ app.post('/claims', zValidator('json', claimCreateSchema), async (c) => {
         b.claimedHours ?? 0,
         b.expectedHours ?? 0,
         b.status ?? null,
+        b.claimType ?? null,
+        b.receivedDate ?? null,
+        b.reference ?? null,
+        b.notes ?? null,
+        b.amount ?? null,
       ],
     ),
   );

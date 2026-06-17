@@ -19,6 +19,8 @@ export interface MarkCreateInput {
   type: DailyLog['type'];
   details?: string;
   time?: string;
+  // Optional YYYY-MM-DD; defaults to today server-side when omitted.
+  date?: string;
 }
 
 export const monitoringKeys = {

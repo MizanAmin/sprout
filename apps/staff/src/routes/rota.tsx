@@ -18,14 +18,11 @@ export const Route = createFileRoute('/rota')({
   component: RotaPage,
 });
 
-// The reference grid shows a Mon–Sun week, but the live `rota` table (migration
-// 005, see apps/api/src/routes/rota.ts) only stores mon..fri text columns —
-// one row per (staff_name, week_start). Sat/Sun are shown as read-only placeholders.
-// TODO: needs the `rota` schema extended with sat/fri columns (and the API
-// create/update schema) to make weekend cells editable.
-const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri'] as const;
-type Weekday = (typeof WEEKDAYS)[number];
-const WEEKEND = ['sat', 'sun'] as const;
+// The grid shows a full Mon–Sun week, backed by the `rota` table (migration 005,
+// see apps/api/src/routes/rota.ts) which stores mon..sun text columns — one row
+// per (staff_name, week_start).
+const DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'] as const;
+type Weekday = (typeof DAYS)[number];
 
 const DAY_LABELS: Record<string, string> = {
   mon: 'Mon',
@@ -146,7 +143,7 @@ function RotaPage() {
               <thead>
                 <tr className="bg-bg text-[10px] uppercase tracking-wide text-muted">
                   <th className="px-3 py-2 font-semibold">Staff Member</th>
-                  {[...WEEKDAYS, ...WEEKEND].map((d) => (
+                  {DAYS.map((d) => (
                     <th key={d} className="px-3 py-2 font-semibold">
                       {DAY_LABELS[d]}
                     </th>
@@ -172,7 +169,7 @@ function RotaPage() {
                         </div>
                       </td>
 
-                      {WEEKDAYS.map((d) => {
+                      {DAYS.map((d) => {
                         const value = (row?.[d] ?? '').trim();
                         return (
                           <td key={d} className="px-2 py-2">
@@ -190,18 +187,6 @@ function RotaPage() {
                           </td>
                         );
                       })}
-
-                      {/* Weekend cells are read-only until the model supports sat/sun. */}
-                      {WEEKEND.map((d) => (
-                        <td key={d} className="px-2 py-2">
-                          <div
-                            className="flex min-h-[44px] w-full items-center justify-center rounded-lg border border-dashed border-border/60 text-[10px] text-muted"
-                            title="Weekend shifts are not yet supported by the rota model"
-                          >
-                            —
-                          </div>
-                        </td>
-                      ))}
                     </tr>
                   );
                 })}
@@ -306,7 +291,7 @@ function ShiftModal({
   const onSubmit = (data: ShiftFormInput) => {
     // Merge: preserve the other days on this staff member's week row.
     const dayValues: Partial<Record<Weekday, string>> = {};
-    for (const d of WEEKDAYS) dayValues[d] = existing?.[d] ?? '';
+    for (const d of DAYS) dayValues[d] = existing?.[d] ?? '';
     dayValues[target.day] = composeDayValue(data);
 
     upsertRota.mutate(

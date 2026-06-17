@@ -39,6 +39,9 @@ const LOCATIONS = [
   'Other',
 ] as const;
 
+// Parent notification methods (mirrors the reference notification panel).
+const PARENT_NOTIFY_METHODS = ['In person', 'Phone', 'Email', 'Text'] as const;
+
 // Colour-code injury types onto the shared Badge variants (the reference uses
 // per-type colours via INJURY_COLOR).
 const INJURY_BADGE: Record<string, 'warning' | 'danger' | 'info' | 'muted'> = {
@@ -103,15 +106,13 @@ function AccidentBookPage() {
 
   const all = accidents ?? [];
 
-  // Stat counts (mirrors the reference stats-grid: total, parent pending,
-  // parent notified, today). The reference also tracks RIDDOR, but the accident
-  // schema (migration 003) has no riddor column.
-  // TODO: needs a `riddor` column on accident_book + /accident-book/stats to
-  // surface a "RIDDOR Required" stat like the reference app.
+  // Stat counts (mirrors the reference stats-grid: total, RIDDOR, parent
+  // pending, parent notified, today).
   const stats = useMemo(() => {
     const t = today();
     return {
       total: all.length,
+      riddor: all.filter((a) => a.riddor_reportable).length,
       pending: all.filter((a) => !a.parent_notified_at).length,
       notified: all.filter((a) => !!a.parent_notified_at).length,
       today: all.filter((a) => a.date === t).length,
@@ -123,6 +124,7 @@ function AccidentBookPage() {
       !search || (a.child_name ?? '').toLowerCase().includes(search.toLowerCase());
     const matchFilter =
       !filter ||
+      (filter === 'riddor' && a.riddor_reportable) ||
       (filter === 'pending' && !a.parent_notified_at) ||
       (filter === 'notified' && !!a.parent_notified_at) ||
       (filter === 'today' && a.date === today());
@@ -148,8 +150,13 @@ function AccidentBookPage() {
       </div>
 
       {/* Stat cards (mirrors the reference stats-grid). Clicking filters the table. */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
         <StatCard label="Total records" value={stats.total} onClick={() => setFilter('')} />
+        <StatCard
+          label="RIDDOR"
+          value={stats.riddor}
+          onClick={() => setFilter((cur) => (cur === 'riddor' ? '' : 'riddor'))}
+        />
         <StatCard
           label="Parent pending"
           value={stats.pending}
@@ -180,6 +187,7 @@ function AccidentBookPage() {
           onChange={(e) => setFilter(e.target.value)}
         >
           <option value="">All records</option>
+          <option value="riddor">RIDDOR reportable</option>
           <option value="pending">Parent pending</option>
           <option value="notified">Parent notified</option>
           <option value="today">Today</option>
@@ -226,13 +234,16 @@ function AccidentBookPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    {a.injury_type ? (
-                      <Badge variant={INJURY_BADGE[a.injury_type] ?? 'muted'}>
-                        {a.injury_type}
-                      </Badge>
-                    ) : (
-                      <span className="text-muted">—</span>
-                    )}
+                    <div className="flex flex-wrap items-center gap-1">
+                      {a.injury_type ? (
+                        <Badge variant={INJURY_BADGE[a.injury_type] ?? 'muted'}>
+                          {a.injury_type}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
+                      {a.riddor_reportable && <Badge variant="danger">RIDDOR</Badge>}
+                    </div>
                     {a.body_part && <div className="mt-1 text-xs text-muted">{a.body_part}</div>}
                   </td>
                   <td className="max-w-[16rem] px-4 py-3 text-muted">
@@ -242,6 +253,9 @@ function AccidentBookPage() {
                     <Badge variant={a.parent_notified_at ? 'success' : 'warning'}>
                       {a.parent_notified_at ? 'Notified' : 'Pending'}
                     </Badge>
+                    {a.parent_notified_at && a.parent_notified_how && (
+                      <div className="mt-1 text-xs text-muted">{a.parent_notified_how}</div>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-muted">{a.first_aider || '—'}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-right">
@@ -333,6 +347,8 @@ function AccidentForm({
   const [followUp, setFollowUp] = useState('');
   const [parentNotified, setParentNotified] = useState(false);
   const [parentNotifiedAt, setParentNotifiedAt] = useState('');
+  const [parentNotifiedHow, setParentNotifiedHow] = useState('');
+  const [riddorReportable, setRiddorReportable] = useState(false);
 
   useEffect(() => {
     setChildId(initial?.child_id ?? '');
@@ -349,6 +365,8 @@ function AccidentForm({
     setFollowUp(initial?.follow_up ?? '');
     setParentNotified(!!initial?.parent_notified_at);
     setParentNotifiedAt(initial?.parent_notified_at ?? '');
+    setParentNotifiedHow(initial?.parent_notified_how ?? '');
+    setRiddorReportable(!!initial?.riddor_reportable);
   }, [initial]);
 
   // Surface the selected child's allergy as a banner (mirrors the reference's
@@ -391,6 +409,8 @@ function AccidentForm({
       witness: witness || undefined,
       followUp: followUp || undefined,
       parentNotifiedAt: parentNotified ? parentNotifiedAt || undefined : undefined,
+      parentNotifiedHow: parentNotified ? parentNotifiedHow || undefined : undefined,
+      riddorReportable,
     });
   };
 
@@ -558,12 +578,8 @@ function AccidentForm({
           Parent notified
         </label>
         {parentNotified && (
-          <div className="mt-3">
+          <div className="mt-3 grid grid-cols-2 gap-4">
             <Field label="Date notified">
-              {/* The reference also records the time and method (In Person / Phone /
-                  Text / Email). The accident schema only has `parent_notified_at`.
-                  TODO: needs `parent_notified_how` (+ time) columns on
-                  accident_book to capture the notification method like the reference. */}
               <input
                 type="date"
                 className="input"
@@ -571,14 +587,33 @@ function AccidentForm({
                 onChange={(e) => setParentNotifiedAt(e.target.value)}
               />
             </Field>
+            <Field label="Notified — how">
+              <select
+                className="input"
+                value={parentNotifiedHow}
+                onChange={(e) => setParentNotifiedHow(e.target.value)}
+              >
+                <option value="">— Select —</option>
+                {PARENT_NOTIFY_METHODS.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </Field>
           </div>
         )}
       </div>
 
-      {/* TODO: the reference modal also captures a "RIDDOR reportable?" flag and
-          staff + parent signatures (staff_signature / parent_signature /
-          signer names). The accident schema (migration 003) has no riddor or
-          signature columns — needs a schema + /accident-book migration. */}
+      {/* RIDDOR reportable flag (mirrors the reference modal). */}
+      <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+        <input
+          type="checkbox"
+          checked={riddorReportable}
+          onChange={(e) => setRiddorReportable(e.target.checked)}
+        />
+        RIDDOR reportable?
+      </label>
 
       <div className="flex justify-end">
         <button type="submit" className="btn-primary" disabled={submitting}>

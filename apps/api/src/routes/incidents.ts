@@ -26,6 +26,8 @@ const COLS: Record<string, string> = {
   parentInformed: 'parent_informed',
   parentInformedAt: 'parent_informed_at',
   signedBy: 'signed_by',
+  bodyPart: 'body_part',
+  riddorRequired: 'riddor_required',
 };
 
 app.get('/', async (c) => {
@@ -59,8 +61,8 @@ app.post('/', zValidator('json', incidentCreateSchema), async (c) => {
     client.query(
       `INSERT INTO incidents
          (nursery_id, child_id, child_name, date, time, type, location, description, action_taken,
-          witness, reported_by, parent_informed, parent_informed_at, signed_by)
-       VALUES ($1,$2,$3,COALESCE($4::date, CURRENT_DATE),$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+          witness, reported_by, parent_informed, parent_informed_at, signed_by, body_part, riddor_required)
+       VALUES ($1,$2,$3,COALESCE($4::date, CURRENT_DATE),$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
        RETURNING *`,
       [
         nurseryId,
@@ -77,6 +79,8 @@ app.post('/', zValidator('json', incidentCreateSchema), async (c) => {
         b.parentInformed ?? false,
         b.parentInformedAt ?? null,
         b.signedBy ?? '',
+        b.bodyPart ?? '',
+        b.riddorRequired ?? false,
       ],
     ),
   );

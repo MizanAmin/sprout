@@ -12,6 +12,8 @@ export interface RotaRow {
   wed: string;
   thu: string;
   fri: string;
+  sat: string;
+  sun: string;
   created_at: string;
 }
 
@@ -23,6 +25,8 @@ export interface RotaUpsertInput {
   wed?: string;
   thu?: string;
   fri?: string;
+  sat?: string;
+  sun?: string;
 }
 
 export const rotaKeys = {

@@ -68,6 +68,11 @@ export interface FundingClaim {
   claimed_hours: number;
   expected_hours: number;
   status: string;
+  claim_type: string | null;
+  received_date: string | null;
+  reference: string | null;
+  notes: string | null;
+  amount: number | null;
 }
 
 // POST/PATCH body (camelCase, matches the API inline zod schema).
@@ -78,6 +83,11 @@ export interface ClaimInput {
   claimedHours?: number;
   expectedHours?: number;
   status?: string;
+  claimType?: string;
+  receivedDate?: string;
+  reference?: string;
+  notes?: string;
+  amount?: number;
 }
 
 export const claimsKeys = {

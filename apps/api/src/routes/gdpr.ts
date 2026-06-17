@@ -26,6 +26,9 @@ const settingsSchema = z.object({
   lawfulBasis: z.string().optional(),
   lastAuditDate: z.string().optional(),
   nextAuditDate: z.string().optional(),
+  icoRegistered: z.boolean().optional(),
+  icoNumber: z.string().optional(),
+  privacyNotice: z.string().optional(),
 });
 
 app.get('/settings', async (c) => {
@@ -46,10 +49,12 @@ const handleSettingsUpsert = async (c: Context<HonoEnv>) => {
       `INSERT INTO gdpr_settings
          (nursery_id, data_controller, dpo_name, dpo_email,
           retention_children, retention_staff, retention_cctv,
-          lawful_basis, last_audit_date, next_audit_date)
+          lawful_basis, last_audit_date, next_audit_date,
+          ico_registered, ico_number, privacy_notice)
        VALUES ($1,COALESCE($2,''),COALESCE($3,''),COALESCE($4,''),
                COALESCE($5,3),COALESCE($6,7),COALESCE($7,30),
-               COALESCE($8,'contract'),$9,$10)
+               COALESCE($8,'contract'),$9,$10,
+               COALESCE($11,false),COALESCE($12,''),COALESCE($13,''))
        ON CONFLICT (nursery_id) DO UPDATE SET
          data_controller    = COALESCE($2, gdpr_settings.data_controller),
          dpo_name           = COALESCE($3, gdpr_settings.dpo_name),
@@ -59,7 +64,10 @@ const handleSettingsUpsert = async (c: Context<HonoEnv>) => {
          retention_cctv     = COALESCE($7, gdpr_settings.retention_cctv),
          lawful_basis       = COALESCE($8, gdpr_settings.lawful_basis),
          last_audit_date    = COALESCE($9, gdpr_settings.last_audit_date),
-         next_audit_date    = COALESCE($10, gdpr_settings.next_audit_date)
+         next_audit_date    = COALESCE($10, gdpr_settings.next_audit_date),
+         ico_registered     = COALESCE($11, gdpr_settings.ico_registered),
+         ico_number         = COALESCE($12, gdpr_settings.ico_number),
+         privacy_notice     = COALESCE($13, gdpr_settings.privacy_notice)
        RETURNING *`,
       [
         nurseryId,
@@ -72,6 +80,9 @@ const handleSettingsUpsert = async (c: Context<HonoEnv>) => {
         b.lawfulBasis ?? null,
         b.lastAuditDate ?? null,
         b.nextAuditDate ?? null,
+        b.icoRegistered ?? null,
+        b.icoNumber ?? null,
+        b.privacyNotice ?? null,
       ],
     ),
   );
@@ -426,6 +437,19 @@ app.post('/privacy-ack', zValidator('json', privacyAckCreateSchema), async (c) =
     ),
   );
   return c.json(rows[0], 201);
+});
+
+// ---- Audit log ----
+
+app.get('/audit', async (c) => {
+  const { nurseryId } = c.get('user');
+  const { rows } = await withTenant(nurseryId, (client) =>
+    client.query(
+      'SELECT * FROM audit_log WHERE nursery_id=$1 ORDER BY created_at DESC LIMIT 100',
+      [nurseryId],
+    ),
+  );
+  return c.json(rows);
 });
 
 export default app;

@@ -18,6 +18,8 @@ export interface Accident {
   first_aider: string;
   witness: string;
   parent_notified_at: string | null;
+  parent_notified_how: string | null;
+  riddor_reportable: boolean;
   follow_up: string;
 }
 

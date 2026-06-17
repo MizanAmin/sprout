@@ -14,6 +14,34 @@ app.use('*', requireAuth, requireRole('manager'));
 
 app.get('/plans', (c) => c.json(PLANS));
 
+// Subscription status for the caller's nursery: plan, trial state, and children usage
+// against the plan's limit (PLANS.<plan>.childrenLimit; null = unlimited on Forest).
+app.get('/status', async (c) => {
+  const { nurseryId } = c.get('user');
+  const result = await withTenant(nurseryId, async (client) => {
+    const nursery = await client.query(
+      'SELECT plan, trial_ends_at FROM nurseries WHERE id=$1',
+      [nurseryId],
+    );
+    const children = await client.query(
+      `SELECT COUNT(*)::int AS count FROM children WHERE nursery_id=$1 AND status='Active'`,
+      [nurseryId],
+    );
+    return { nursery: nursery.rows[0], childrenCount: children.rows[0].count as number };
+  });
+
+  const n = result.nursery as { plan?: string; trial_ends_at?: string | null } | undefined;
+  const plan = n?.plan ?? 'seedling';
+  const childrenLimit = plan in PLANS ? PLANS[plan as keyof typeof PLANS].childrenLimit : null;
+
+  return c.json({
+    plan,
+    childrenCount: result.childrenCount,
+    childrenLimit,
+    trialEndsAt: n?.trial_ends_at ?? null,
+  });
+});
+
 const checkoutSchema = z.object({
   plan: z.enum(['seedling', 'blossom', 'grove', 'forest']),
   cycle: z.enum(['monthly', 'annual']),

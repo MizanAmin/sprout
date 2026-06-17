@@ -7,7 +7,7 @@ import type { Child } from '../children/useChildren';
 
 // Map an API relative row (snake_case) to form defaults (camelCase schema keys).
 function toFormValues(r?: Relative): Partial<RelativeCreateInput> {
-  if (!r) return { isPrimaryContact: false, isEmergencyContact: true };
+  if (!r) return { isPrimaryContact: false, isEmergencyContact: true, hasPortalAccess: false };
   return {
     childId: r.child_id ?? undefined,
     name: r.name,
@@ -17,6 +17,7 @@ function toFormValues(r?: Relative): Partial<RelativeCreateInput> {
     address: r.address || undefined,
     isPrimaryContact: r.is_primary_contact,
     isEmergencyContact: r.is_emergency_contact,
+    hasPortalAccess: r.has_portal_access,
   };
 }
 
@@ -77,6 +78,10 @@ export function RelativeForm({
         <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
           <input type="checkbox" {...register('isEmergencyContact')} />
           Emergency contact
+        </label>
+        <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+          <input type="checkbox" {...register('hasPortalAccess')} />
+          Portal access
         </label>
       </div>
       <div className="flex justify-end">

@@ -24,9 +24,12 @@ import {
   type ErasureStatus,
   useRetentionPolicies,
   useCreateRetention,
+  useUpdateRetention,
   useDeleteRetention,
   retentionCreateSchema,
   type RetentionCreateInput,
+  type RetentionPolicy,
+  useAuditLog,
 } from '../features/gdpr/useGdpr';
 import { Field, Modal, Badge, Spinner, EmptyState, StatCard } from '../components/ui';
 
@@ -101,6 +104,10 @@ function GdprPage() {
           <RetentionCard />
         </div>
       </div>
+
+      <div className="grid gap-4">
+        <AuditLogCard />
+      </div>
     </div>
   );
 }
@@ -119,6 +126,9 @@ function toSettingsValues(s: GdprSettings | null): GdprSettingsInput {
     lawfulBasis: s.lawful_basis,
     lastAuditDate: s.last_audit_date ?? undefined,
     nextAuditDate: s.next_audit_date ?? undefined,
+    icoRegistered: s.ico_registered,
+    icoNumber: s.ico_number,
+    privacyNotice: s.privacy_notice,
   };
 }
 
@@ -128,10 +138,6 @@ function SettingsCard({ query }: { query: ReturnType<typeof useGdprSettings> }) 
     <div className="card space-y-4">
       <h2 className="font-semibold text-gray-900">ICO &amp; DPO details</h2>
       {isLoading ? <Spinner /> : <SettingsForm settings={data ?? null} />}
-      {/* TODO: needs ico_registered / ico_number / privacy_notice fields — not in
-          the /gdpr/settings shape (useGdpr GdprSettings). Add columns + schema
-          fields to surface the "Registered with the ICO" toggle and the privacy
-          notice textarea from the reference. */}
     </div>
   );
 }
@@ -197,6 +203,23 @@ function SettingsForm({ settings }: { settings: GdprSettings | null }) {
           <input type="date" {...register('nextAuditDate')} className="input" />
         </Field>
       </div>
+      <div className="grid grid-cols-2 items-end gap-4">
+        <Field label="ICO number" error={errors.icoNumber?.message}>
+          <input {...register('icoNumber')} className="input" placeholder="e.g. ZA123456" />
+        </Field>
+        <label className="flex items-center gap-2 pb-2.5 text-sm text-gray-900">
+          <input type="checkbox" {...register('icoRegistered')} className="h-4 w-4" />
+          Registered with the ICO
+        </label>
+      </div>
+      <Field label="Privacy notice" error={errors.privacyNotice?.message}>
+        <textarea
+          {...register('privacyNotice')}
+          className="input"
+          rows={4}
+          placeholder="Your published privacy notice text…"
+        />
+      </Field>
       <div className="rounded-lg border border-warning/40 bg-warning-light px-3.5 py-2.5 text-xs text-warning">
         Most nurseries must register with the ICO.{' '}
         <a
@@ -498,8 +521,31 @@ function ErasureForm({
 function RetentionCard() {
   const { data, isLoading } = useRetentionPolicies();
   const create = useCreateRetention();
+  const update = useUpdateRetention();
   const remove = useDeleteRetention();
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [draftYears, setDraftYears] = useState('');
+  const [draftBasis, setDraftBasis] = useState('');
+
+  const startEdit = (p: RetentionPolicy) => {
+    setEditingId(p.id);
+    setDraftYears(String(p.retention_period_years));
+    setDraftBasis(p.legal_basis);
+  };
+
+  const saveEdit = (id: number) => {
+    update.mutate(
+      {
+        id,
+        data: {
+          retentionPeriodYears: draftYears === '' ? 0 : Number(draftYears),
+          legalBasis: draftBasis,
+        },
+      },
+      { onSuccess: () => setEditingId(null) },
+    );
+  };
 
   return (
     <div className="card space-y-4">
@@ -532,34 +578,73 @@ function RetentionCard() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {data.map((p) => (
-                <tr key={p.id} className="hover:bg-gray-50">
-                  <td className="px-3 py-2">{p.data_category}</td>
-                  <td className="px-3 py-2 font-semibold">{p.retention_period_years}y</td>
-                  <td className="px-3 py-2 text-muted">{p.legal_basis || '—'}</td>
-                  <td className="px-3 py-2 text-right">
-                    {/* TODO: needs an edit modal wired to useUpdateRetention (PATCH
-                        /gdpr/retention/:id exists). Reference allows inline editing
-                        of years + legal basis on row click. */}
-                    <button
-                      className="text-xs font-medium text-danger"
-                      onClick={() => {
-                        if (confirm(`Delete policy "${p.data_category}"?`)) remove.mutate(p.id);
-                      }}
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {data.map((p) =>
+                editingId === p.id ? (
+                  <tr key={p.id} className="bg-gray-50">
+                    <td className="px-3 py-2">{p.data_category}</td>
+                    <td className="px-3 py-2">
+                      <input
+                        type="number"
+                        value={draftYears}
+                        onChange={(e) => setDraftYears(e.target.value)}
+                        className="input !w-20 !py-1 text-xs"
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        value={draftBasis}
+                        onChange={(e) => setDraftBasis(e.target.value)}
+                        className="input !py-1 text-xs"
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <div className="flex justify-end gap-3">
+                        <button
+                          className="text-xs font-medium text-primary"
+                          onClick={() => saveEdit(p.id)}
+                          disabled={update.isPending}
+                        >
+                          Save
+                        </button>
+                        <button
+                          className="text-xs font-medium text-muted"
+                          onClick={() => setEditingId(null)}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  <tr key={p.id} className="hover:bg-gray-50">
+                    <td className="px-3 py-2">{p.data_category}</td>
+                    <td className="px-3 py-2 font-semibold">{p.retention_period_years}y</td>
+                    <td className="px-3 py-2 text-muted">{p.legal_basis || '—'}</td>
+                    <td className="px-3 py-2 text-right">
+                      <div className="flex justify-end gap-3">
+                        <button
+                          className="text-xs font-medium text-primary"
+                          onClick={() => startEdit(p)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="text-xs font-medium text-danger"
+                          onClick={() => {
+                            if (confirm(`Delete policy "${p.data_category}"?`)) remove.mutate(p.id);
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ),
+              )}
             </tbody>
           </table>
         </div>
       )}
-
-      {/* TODO: needs /gdpr/audit endpoint — reference shows an Audit Log card
-          (recent data access / SAR_EXPORT / ERASURE entries). Not exposed by
-          useGdpr or apps/api/src/routes/gdpr.ts. */}
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Add retention policy">
         <RetentionForm
@@ -605,5 +690,51 @@ function RetentionForm({
         </button>
       </div>
     </form>
+  );
+}
+
+// ---- Audit log ----
+
+function AuditLogCard() {
+  const { data, isLoading } = useAuditLog();
+
+  return (
+    <div className="card space-y-4">
+      <h2 className="font-semibold text-gray-900">Audit log</h2>
+      <p className="text-xs text-muted">
+        Recent activity recorded across the system (most recent 100 entries).
+      </p>
+
+      {isLoading ? (
+        <Spinner />
+      ) : !data?.length ? (
+        <EmptyState title="No audit entries" description="Recorded activity appears here." />
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-border">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-gray-50 text-muted">
+              <tr>
+                <th className="px-3 py-2 font-medium">Action</th>
+                <th className="px-3 py-2 font-medium">Table</th>
+                <th className="px-3 py-2 font-medium">User</th>
+                <th className="px-3 py-2 font-medium">Date</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {data.map((e) => (
+                <tr key={e.id} className="hover:bg-gray-50">
+                  <td className="px-3 py-2 font-medium text-gray-900">{e.action}</td>
+                  <td className="px-3 py-2 text-muted">{e.table_name || '—'}</td>
+                  <td className="px-3 py-2 text-muted">{e.user_name || '—'}</td>
+                  <td className="px-3 py-2 text-muted">
+                    {new Date(e.created_at).toLocaleString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }

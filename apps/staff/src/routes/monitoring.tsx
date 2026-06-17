@@ -284,7 +284,6 @@ function AddMarkModal({
 
   // Sync the pre-selected child each time the modal opens for a row.
   const activeChildId = childId === '' ? (child?.id ?? '') : childId;
-  const isToday = date === today();
 
   const reset = () => {
     setChildId('');
@@ -301,6 +300,7 @@ function AddMarkModal({
       type,
       time: time || undefined,
       details: details || undefined,
+      date,
     };
     createMark.mutate(data, {
       onSuccess: () => {
@@ -313,14 +313,6 @@ function AddMarkModal({
   return (
     <Modal open={open} onClose={onClose} title="Add daily check">
       <form onSubmit={submit} className="space-y-4">
-        {!isToday && (
-          // The POST endpoint always inserts for CURRENT_DATE; it cannot
-          // backdate a mark to the selected day.
-          <p className="rounded-lg bg-warning-light px-3 py-2 text-xs text-warning">
-            Marks are always recorded for today. Switch the date back to today to add a check.
-            {/* TODO: needs POST /monitoring to accept a `date` to log historic checks. */}
-          </p>
-        )}
         <Field label="Child">
           <select
             value={activeChildId}
@@ -377,7 +369,7 @@ function AddMarkModal({
           <button
             type="submit"
             className="btn-primary"
-            disabled={createMark.isPending || activeChildId === '' || !isToday}
+            disabled={createMark.isPending || activeChildId === ''}
           >
             {createMark.isPending ? 'Saving…' : 'Save check'}
           </button>

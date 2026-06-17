@@ -19,6 +19,8 @@ export interface Incident {
   parent_informed: boolean;
   parent_informed_at: string | null;
   signed_by: string;
+  body_part: string;
+  riddor_required: boolean;
 }
 
 export const incidentsKeys = {

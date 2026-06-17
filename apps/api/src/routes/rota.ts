@@ -19,6 +19,8 @@ const createSchema = z.object({
   wed: z.string().optional(),
   thu: z.string().optional(),
   fri: z.string().optional(),
+  sat: z.string().optional(),
+  sun: z.string().optional(),
 });
 
 const updateSchema = createSchema.partial();
@@ -31,6 +33,8 @@ const COLS: Record<string, string> = {
   wed: 'wed',
   thu: 'thu',
   fri: 'fri',
+  sat: 'sat',
+  sun: 'sun',
 };
 
 app.get('/', async (c) => {
@@ -63,10 +67,10 @@ app.post('/', zValidator('json', createSchema), async (c) => {
   const b = c.req.valid('json');
   const { rows } = await withTenant(nurseryId, (client) =>
     client.query(
-      `INSERT INTO rota (nursery_id, staff_name, week_start, mon, tue, wed, thu, fri)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+      `INSERT INTO rota (nursery_id, staff_name, week_start, mon, tue, wed, thu, fri, sat, sun)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
        ON CONFLICT (nursery_id, staff_name, week_start)
-       DO UPDATE SET mon=EXCLUDED.mon, tue=EXCLUDED.tue, wed=EXCLUDED.wed, thu=EXCLUDED.thu, fri=EXCLUDED.fri
+       DO UPDATE SET mon=EXCLUDED.mon, tue=EXCLUDED.tue, wed=EXCLUDED.wed, thu=EXCLUDED.thu, fri=EXCLUDED.fri, sat=EXCLUDED.sat, sun=EXCLUDED.sun
        RETURNING *`,
       [
         nurseryId,
@@ -77,6 +81,8 @@ app.post('/', zValidator('json', createSchema), async (c) => {
         b.wed ?? '',
         b.thu ?? '',
         b.fri ?? '',
+        b.sat ?? '',
+        b.sun ?? '',
       ],
     ),
   );

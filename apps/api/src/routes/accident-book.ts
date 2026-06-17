@@ -24,6 +24,8 @@ const COLS: Record<string, string> = {
   firstAider: 'first_aider',
   witness: 'witness',
   parentNotifiedAt: 'parent_notified_at',
+  parentNotifiedHow: 'parent_notified_how',
+  riddorReportable: 'riddor_reportable',
   followUp: 'follow_up',
 };
 
@@ -58,8 +60,8 @@ app.post('/', zValidator('json', accidentCreateSchema), async (c) => {
     client.query(
       `INSERT INTO accident_book
          (nursery_id, child_id, child_name, date, time, location, description, injury_type, body_part,
-          first_aid_given, first_aider, witness, parent_notified_at, follow_up)
-       VALUES ($1,$2,$3,COALESCE($4::date, CURRENT_DATE),$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+          first_aid_given, first_aider, witness, parent_notified_at, parent_notified_how, riddor_reportable, follow_up)
+       VALUES ($1,$2,$3,COALESCE($4::date, CURRENT_DATE),$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
        RETURNING *`,
       [
         nurseryId,
@@ -75,6 +77,8 @@ app.post('/', zValidator('json', accidentCreateSchema), async (c) => {
         b.firstAider ?? name,
         b.witness ?? '',
         b.parentNotifiedAt ?? null,
+        b.parentNotifiedHow ?? null,
+        b.riddorReportable ?? false,
         b.followUp ?? '',
       ],
     ),

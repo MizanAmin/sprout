@@ -5,6 +5,7 @@ import {
   useCreateWaitingListEntry,
   useUpdateWaitingListEntry,
   useDeleteWaitingListEntry,
+  useMoveWaitingList,
   type WaitingListEntry,
   type WaitingListCreateInput,
   type WaitingStatus,
@@ -49,6 +50,7 @@ function WaitingListPage() {
   const { data: entries, isLoading } = useWaitingList(status ? { status } : {});
   const createEntry = useCreateWaitingListEntry();
   const deleteEntry = useDeleteWaitingListEntry();
+  const moveEntry = useMoveWaitingList();
 
   const allEntries = entries ?? [];
 
@@ -162,12 +164,30 @@ function WaitingListPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {ordered.map((e) => (
+              {ordered.map((e, idx) => (
                 <tr key={e.id} className="hover:bg-gray-50">
-                  {/* TODO: needs PATCH /waiting-list/:id/move to render ▲▼ reorder
-                      controls from the reference; only the static position shows. */}
                   <td className="px-4 py-2">
-                    <span className="text-base font-bold text-primary">{e.position}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-base font-bold text-primary">{e.position}</span>
+                      <div className="flex flex-col leading-none">
+                        <button
+                          className="text-xs text-muted hover:text-primary disabled:opacity-30"
+                          aria-label="Move up"
+                          disabled={idx === 0 || moveEntry.isPending}
+                          onClick={() => moveEntry.mutate({ id: e.id, direction: 'up' })}
+                        >
+                          ▲
+                        </button>
+                        <button
+                          className="text-xs text-muted hover:text-primary disabled:opacity-30"
+                          aria-label="Move down"
+                          disabled={idx === ordered.length - 1 || moveEntry.isPending}
+                          onClick={() => moveEntry.mutate({ id: e.id, direction: 'down' })}
+                        >
+                          ▼
+                        </button>
+                      </div>
+                    </div>
                   </td>
                   <td className="px-4 py-2">
                     <div className="font-semibold text-gray-900">{e.child_name}</div>

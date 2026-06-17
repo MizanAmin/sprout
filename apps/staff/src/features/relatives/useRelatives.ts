@@ -14,6 +14,7 @@ export interface Relative {
   address: string;
   is_primary_contact: boolean;
   is_emergency_contact: boolean;
+  has_portal_access: boolean;
 }
 
 export const relativesKeys = {

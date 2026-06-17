@@ -18,6 +18,11 @@ const createSchema = z.object({
   type: z.enum(['meal', 'sleep', 'nappy', 'mood', 'activity', 'note']),
   details: z.string().optional(),
   time: z.string().optional(),
+  // Optional YYYY-MM-DD; defaults to CURRENT_DATE so historic checks can be logged.
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
 });
 
 // GET /?date= -> daily_logs rows for that date (default today) for the nursery,
@@ -37,16 +42,16 @@ app.get('/', async (c) => {
   return c.json(rows);
 });
 
-// POST / -> insert a daily_logs "mark" for today.
+// POST / -> insert a daily_logs "mark" for the given date (defaults to today).
 app.post('/', zValidator('json', createSchema), async (c) => {
   const { nurseryId, name } = c.get('user');
   const b = c.req.valid('json');
   const { rows } = await withTenant(nurseryId, (client) =>
     client.query(
       `INSERT INTO daily_logs (nursery_id, child_id, date, time, type, details, added_by)
-       VALUES ($1,$2,CURRENT_DATE,$3,$4,$5,$6)
+       VALUES ($1,$2,COALESCE($3::date, CURRENT_DATE),$4,$5,$6,$7)
        RETURNING *`,
-      [nurseryId, b.childId, b.time ?? null, b.type, b.details ?? null, name],
+      [nurseryId, b.childId, b.date ?? null, b.time ?? null, b.type, b.details ?? null, name],
     ),
   );
   return c.json(rows[0], 201);

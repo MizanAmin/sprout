@@ -16,6 +16,8 @@ export const incidentCreateSchema = z.object({
   parentInformed: z.boolean().optional(),
   parentInformedAt: z.string().optional(),
   signedBy: z.string().optional(),
+  bodyPart: z.string().optional(),
+  riddorRequired: z.boolean().optional(),
 });
 
 export const incidentUpdateSchema = incidentCreateSchema.partial();

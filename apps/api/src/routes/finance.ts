@@ -94,7 +94,28 @@ app.get('/revenue', async (c) => {
        ORDER BY outstanding DESC`,
       [nurseryId],
     );
-    return { monthly: monthly.rows, totals: totals.rows[0], aging: aging.rows[0], byChild: byChild.rows };
+    // Invoices have no category column, so break the invoiced total down by status
+    // (Paid / Pending / Overdue — Cancelled excluded, matching the KPI totals).
+    const byStatus = await client.query(
+      `SELECT status AS type, COALESCE(SUM(amount),0)::numeric AS total, COUNT(*)::int AS count
+       FROM invoices
+       WHERE nursery_id=$1 AND status<>'Cancelled'
+       GROUP BY status
+       ORDER BY total DESC`,
+      [nurseryId],
+    );
+    const counts = await client.query(
+      `SELECT COUNT(*)::int AS invoice_count FROM invoices WHERE nursery_id=$1 AND status<>'Cancelled'`,
+      [nurseryId],
+    );
+    return {
+      monthly: monthly.rows,
+      totals: totals.rows[0],
+      aging: aging.rows[0],
+      byChild: byChild.rows,
+      byType: byStatus.rows,
+      invoiceCount: counts.rows[0].invoice_count,
+    };
   });
 
   const t = result.totals;
@@ -113,6 +134,13 @@ app.get('/revenue', async (c) => {
     },
     aging: result.aging,
     byChild: result.byChild,
+    invoiceCount: result.invoiceCount,
+    // Grouped by invoice status (no category column exists on invoices).
+    byType: result.byType.map((r: { type: string; total: string; count: number }) => ({
+      type: r.type,
+      total: Number(r.total),
+      count: Number(r.count),
+    })),
   });
 });
 

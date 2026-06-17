@@ -85,6 +85,8 @@ function IncidentsPage() {
     return map;
   }, [all]);
 
+  const riddorCount = useMemo(() => all.filter((i) => i.riddor_required).length, [all]);
+
   const filtered = all.filter(
     (i) =>
       (!search || i.child_name.toLowerCase().includes(search.toLowerCase())) &&
@@ -112,7 +114,7 @@ function IncidentsPage() {
       </div>
 
       {/* Stat cards by type — clicking filters the table. */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
         {INCIDENT_TYPES.map((t) => (
           <StatCard
             key={t}
@@ -121,6 +123,7 @@ function IncidentsPage() {
             onClick={() => setTypeFilter((cur) => (cur === t ? '' : t))}
           />
         ))}
+        <StatCard label="RIDDOR reportable" value={riddorCount} />
       </div>
 
       <div className="flex flex-wrap gap-3">
@@ -170,6 +173,7 @@ function IncidentsPage() {
                 <th className="px-4 py-2 font-medium">Type</th>
                 <th className="px-4 py-2 font-medium">Description</th>
                 <th className="px-4 py-2 font-medium">Action taken</th>
+                <th className="px-4 py-2 font-medium">RIDDOR</th>
                 <th className="px-4 py-2 font-medium">Parent</th>
                 <th className="px-4 py-2 font-medium">Recorded by</th>
                 <th className="px-4 py-2 text-right font-medium">Actions</th>
@@ -198,8 +202,20 @@ function IncidentsPage() {
                   <td className="px-4 py-3">
                     <Badge variant={TYPE_BADGE[i.type] ?? 'muted'}>{i.type || 'Incident'}</Badge>
                   </td>
-                  <td className="max-w-xs px-4 py-3 text-muted">{i.description || '—'}</td>
+                  <td className="max-w-xs px-4 py-3 text-muted">
+                    <div>{i.description || '—'}</div>
+                    {i.body_part && (
+                      <div className="mt-1 text-xs text-muted">Body part: {i.body_part}</div>
+                    )}
+                  </td>
                   <td className="max-w-xs px-4 py-3 text-muted">{i.action_taken || '—'}</td>
+                  <td className="px-4 py-3">
+                    {i.riddor_required ? (
+                      <Badge variant="danger">RIDDOR</Badge>
+                    ) : (
+                      <span className="text-muted">—</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <Badge variant={i.parent_informed ? 'success' : 'warning'}>
                       {i.parent_informed ? 'Informed' : 'Pending'}
@@ -291,6 +307,8 @@ function IncidentForm({
   const [parentInformed, setParentInformed] = useState(false);
   const [parentInformedAt, setParentInformedAt] = useState('');
   const [signedBy, setSignedBy] = useState('');
+  const [bodyPart, setBodyPart] = useState('');
+  const [riddorRequired, setRiddorRequired] = useState(false);
 
   useEffect(() => {
     setChildId(initial?.child_id ?? '');
@@ -306,6 +324,8 @@ function IncidentForm({
     setParentInformed(initial?.parent_informed ?? false);
     setParentInformedAt(initial?.parent_informed_at ?? '');
     setSignedBy(initial?.signed_by ?? '');
+    setBodyPart(initial?.body_part ?? '');
+    setRiddorRequired(initial?.riddor_required ?? false);
   }, [initial]);
 
   // Surface the selected child's allergy as a banner (mirrors the reference's
@@ -337,6 +357,8 @@ function IncidentForm({
       parentInformed,
       parentInformedAt: parentInformed ? parentInformedAt || undefined : undefined,
       signedBy: signedBy || undefined,
+      bodyPart: bodyPart || undefined,
+      riddorRequired,
     });
   };
 
@@ -401,10 +423,23 @@ function IncidentForm({
         />
       </Field>
 
-      {/* TODO: the reference modal also captures a "Body Part" field and a
-          "RIDDOR reportable?" flag. The incidents table/schema (migration 003)
-          has no body_part or riddor_required columns — needs a schema +
-          /incidents migration to support them. */}
+      <Field label="Body part">
+        <input
+          className="input"
+          value={bodyPart}
+          onChange={(e) => setBodyPart(e.target.value)}
+          placeholder="e.g. Left knee, Forehead"
+        />
+      </Field>
+
+      <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+        <input
+          type="checkbox"
+          checked={riddorRequired}
+          onChange={(e) => setRiddorRequired(e.target.checked)}
+        />
+        RIDDOR reportable?
+      </label>
 
       <Field label="Description">
         <textarea

@@ -18,6 +18,7 @@ const COLS: Record<string, string> = {
   address: 'address',
   isPrimaryContact: 'is_primary_contact',
   isEmergencyContact: 'is_emergency_contact',
+  hasPortalAccess: 'has_portal_access',
 };
 
 app.get('/', async (c) => {
@@ -51,8 +52,8 @@ app.post('/', requireRole('manager', 'staff'), zValidator('json', relativeCreate
   const { rows } = await withTenant(nurseryId, (client) =>
     client.query(
       `INSERT INTO relatives
-         (nursery_id, child_id, name, relation, phone, email, address, is_primary_contact, is_emergency_contact)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+         (nursery_id, child_id, name, relation, phone, email, address, is_primary_contact, is_emergency_contact, has_portal_access)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
        RETURNING *`,
       [
         nurseryId,
@@ -64,6 +65,7 @@ app.post('/', requireRole('manager', 'staff'), zValidator('json', relativeCreate
         b.address ?? null,
         b.isPrimaryContact ?? false,
         b.isEmergencyContact ?? true,
+        b.hasPortalAccess ?? false,
       ],
     ),
   );

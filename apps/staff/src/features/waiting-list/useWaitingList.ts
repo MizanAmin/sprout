@@ -90,3 +90,23 @@ export function useDeleteWaitingListEntry() {
     onSuccess: () => qc.invalidateQueries({ queryKey: waitingListKeys.all }),
   });
 }
+
+export type MoveDirection = 'up' | 'down';
+
+export function useMoveWaitingList() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, direction }: { id: number; direction: MoveDirection }) =>
+      api.patch<WaitingListEntry>(`/waiting-list/${id}/move`, { direction }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: waitingListKeys.all }),
+  });
+}
+
+export function useAddFromEnquiry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (enquiryId: number) =>
+      api.post<WaitingListEntry>('/waiting-list/from-enquiry', { enquiryId }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: waitingListKeys.all }),
+  });
+}

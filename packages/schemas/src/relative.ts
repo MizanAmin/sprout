@@ -11,6 +11,7 @@ export const relativeCreateSchema = z.object({
   address: z.string().optional(),
   isPrimaryContact: z.boolean().optional(),
   isEmergencyContact: z.boolean().optional(),
+  hasPortalAccess: z.boolean().optional(),
 });
 
 export const relativeUpdateSchema = relativeCreateSchema.partial();

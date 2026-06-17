@@ -52,7 +52,7 @@ function RevenueReportPage() {
 }
 
 function RevenueContent({ report, period }: { report: RevenueReport; period: Period }) {
-  const { kpis, monthly, aging, byChild } = report;
+  const { kpis, monthly, aging, byChild, byType, invoiceCount } = report;
   const collectionTone =
     kpis.collectionRate >= 90
       ? 'text-success'
@@ -81,7 +81,9 @@ function RevenueContent({ report, period }: { report: RevenueReport; period: Per
               {gbp(kpis.outstanding)}
             </span>
           }
-          hint={`${gbp(kpis.avgPerChild)} avg per child`}
+          hint={`${gbp(kpis.avgPerChild)} avg per child · ${invoiceCount} invoice${
+            invoiceCount === 1 ? '' : 's'
+          }`}
         />
       </div>
 
@@ -90,9 +92,65 @@ function RevenueContent({ report, period }: { report: RevenueReport; period: Per
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <AgingBreakdown aging={aging} />
-        <ByChildTable byChild={byChild} />
+        <ByTypeBreakdown byType={byType} invoiceCount={invoiceCount} />
       </div>
+
+      <ByChildTable byChild={byChild} />
     </>
+  );
+}
+
+// Invoiced total broken down by invoice status (Paid / Pending / Overdue).
+function ByTypeBreakdown({
+  byType,
+  invoiceCount,
+}: {
+  byType: RevenueReport['byType'];
+  invoiceCount: number;
+}) {
+  const total = byType.reduce((sum, r) => sum + r.total, 0);
+  const toneFor = (type: string): string =>
+    type === 'Paid'
+      ? 'bg-success'
+      : type === 'Overdue'
+        ? 'bg-danger'
+        : type === 'Pending'
+          ? 'bg-warning'
+          : 'bg-info';
+
+  return (
+    <section className="card">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="font-semibold text-gray-900">Invoiced by status</h2>
+        <span className="text-xs text-muted">
+          {invoiceCount} invoice{invoiceCount === 1 ? '' : 's'}
+        </span>
+      </div>
+      {byType.length === 0 ? (
+        <EmptyState title="No invoices" description="No invoices for this nursery." />
+      ) : (
+        <div className="space-y-3">
+          {byType.map((r) => {
+            const pct = total > 0 ? Math.round((r.total / total) * 100) : 0;
+            return (
+              <div key={r.type} className="flex items-center gap-3">
+                <span className="w-20 flex-shrink-0 text-xs text-muted">
+                  {r.type}
+                  <span className="ml-1 text-gray-400">({r.count})</span>
+                </span>
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-border">
+                  <div className={`h-full rounded-full ${toneFor(r.type)}`} style={{ width: `${pct}%` }} />
+                </div>
+                <span className="w-20 text-right text-sm font-semibold text-gray-900">
+                  {gbp(r.total)}
+                </span>
+                <span className="w-8 text-right text-xs text-muted">{pct}%</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
   );
 }
 

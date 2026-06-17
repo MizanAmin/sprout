@@ -14,6 +14,8 @@ export const accidentCreateSchema = z.object({
   firstAider: z.string().optional(),
   witness: z.string().optional(),
   parentNotifiedAt: z.string().optional(),
+  parentNotifiedHow: z.string().optional(),
+  riddorReportable: z.boolean().optional(),
   followUp: z.string().optional(),
 });
 

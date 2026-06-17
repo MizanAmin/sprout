@@ -29,6 +29,9 @@ export interface RevenueReport {
   };
   aging: { d0_30: number; d31_60: number; d61_90: number; d90_plus: number };
   byChild: { child_id: number; child_name: string; outstanding: number }[];
+  invoiceCount: number;
+  // Grouped by invoice status (Paid / Pending / Overdue) — no category column exists.
+  byType: { type: string; total: number; count: number }[];
 }
 
 export const financeKeys = {

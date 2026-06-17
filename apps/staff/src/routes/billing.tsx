@@ -13,6 +13,14 @@ export const Route = createFileRoute('/billing')({
 // Plans render in catalogue order (cheapest → richest); used for upgrade/downgrade labels.
 const PLAN_ORDER: PlanKey[] = ['seedling', 'blossom', 'grove', 'forest'];
 
+// GET /billing/status — subscription + children usage for the caller's nursery.
+interface BillingStatus {
+  plan: string;
+  childrenCount: number;
+  childrenLimit: number | null;
+  trialEndsAt: string | null;
+}
+
 // Mirrors the reference app's per-feature copy (plans.ts only exposes boolean flags).
 const FEATURE_LABELS: Record<string, string> = {
   autoInvoice: 'Automated invoicing',
@@ -39,6 +47,12 @@ function BillingPage() {
   const plansQuery = useQuery({
     queryKey: ['billing', 'plans'],
     queryFn: () => api.get<typeof PLANS>('/billing/plans'),
+  });
+
+  // Children usage (used / limit) + plan/trial straight from the nursery row.
+  const statusQuery = useQuery({
+    queryKey: ['billing', 'status'],
+    queryFn: () => api.get<BillingStatus>('/billing/status'),
   });
 
   const checkout = useMutation({
@@ -80,6 +94,7 @@ function BillingPage() {
             cycle={cycle}
             trial={trial}
             isCancelled={isCancelled}
+            status={statusQuery.data}
             onManage={() => portal.mutate()}
             managing={portal.isPending}
           />
@@ -137,6 +152,7 @@ function CurrentPlanCard({
   cycle,
   trial,
   isCancelled,
+  status,
   onManage,
   managing,
 }: {
@@ -145,6 +161,7 @@ function CurrentPlanCard({
   cycle: BillingCycle;
   trial: { active: boolean; daysLeft: number };
   isCancelled: boolean;
+  status?: BillingStatus;
   onManage: () => void;
   managing: boolean;
 }) {
@@ -177,12 +194,7 @@ function CurrentPlanCard({
               No charge until your trial ends.
             </p>
           )}
-          {/* TODO: needs GET /billing/status — children usage (used / limit + progress bar) is not exposed by any endpoint. */}
-          <p className="mt-1 text-sm text-muted">
-            {plan.childrenLimit == null
-              ? 'Unlimited children'
-              : `Up to ${plan.childrenLimit} children`}
-          </p>
+          <ChildrenUsage plan={plan} status={status} />
         </div>
         <button
           type="button"
@@ -193,6 +205,51 @@ function CurrentPlanCard({
           {managing ? 'Opening…' : 'Manage billing & invoices'}
         </button>
       </div>
+    </div>
+  );
+}
+
+// Children usage line + progress bar (used / limit). Falls back to the static plan
+// limit while GET /billing/status is loading or unavailable.
+function ChildrenUsage({
+  plan,
+  status,
+}: {
+  plan: (typeof PLANS)[PlanKey];
+  status?: BillingStatus;
+}) {
+  const limit = status?.childrenLimit ?? plan.childrenLimit;
+  const used = status?.childrenCount;
+
+  if (limit == null) {
+    return (
+      <p className="mt-1 text-sm text-muted">
+        {used != null ? `${used} children · unlimited` : 'Unlimited children'}
+      </p>
+    );
+  }
+
+  if (used == null) {
+    return <p className="mt-1 text-sm text-muted">Up to {limit} children</p>;
+  }
+
+  const pct = limit > 0 ? Math.min(Math.round((used / limit) * 100), 100) : 0;
+  const tone = pct >= 100 ? 'bg-danger' : pct >= 80 ? 'bg-warning' : 'bg-primary';
+
+  return (
+    <div className="mt-2 max-w-xs">
+      <div className="flex items-center justify-between text-sm">
+        <span className="text-muted">Children</span>
+        <span className="font-medium text-gray-900">
+          {used} / {limit}
+        </span>
+      </div>
+      <div className="mt-1 h-2 overflow-hidden rounded-full bg-border">
+        <div className={`h-full rounded-full ${tone}`} style={{ width: `${pct}%` }} />
+      </div>
+      {pct >= 100 && (
+        <p className="mt-1 text-xs text-danger">Plan limit reached — upgrade to add more children.</p>
+      )}
     </div>
   );
 }
