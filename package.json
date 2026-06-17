@@ -14,6 +14,23 @@
     "test": "turbo run test",
     "clean": "turbo run clean && rm -rf node_modules"
   },
+  "pnpm": {
+    "overrides": {
+      "metro": "~0.81.0",
+      "metro-cache": "~0.81.0",
+      "metro-cache-key": "~0.81.0",
+      "metro-config": "~0.81.0",
+      "metro-core": "~0.81.0",
+      "metro-file-map": "~0.81.0",
+      "metro-resolver": "~0.81.0",
+      "metro-runtime": "~0.81.0",
+      "metro-source-map": "~0.81.0",
+      "metro-symbolicate": "~0.81.0",
+      "metro-transform-plugins": "~0.81.0",
+      "metro-transform-worker": "~0.81.0",
+      "metro-minify-terser": "~0.81.0"
+    }
+  },
   "devDependencies": {
     "turbo": "^2.1.0"
   }
