@@ -15,171 +15,256 @@ import {
   type ClaimInput,
 } from '../features/funding/useFunding';
 import { useChildren } from '../features/children/useChildren';
-import { Modal, Field, Spinner, EmptyState, Badge } from '../components/ui';
+import { Modal, Field, Spinner, EmptyState, Badge, StatCard } from '../components/ui';
 
 export const Route = createFileRoute('/funding')({
   component: FundingPage,
 });
 
+// Maps a claim status to a Badge variant. The reference app uses
+// short/over/matched; here we map the hours-based statuses the API exposes
+// (draft/submitted/reconciled) plus those reference values for forward-compat.
+function statusVariant(status: string): 'success' | 'warning' | 'danger' | 'info' | 'muted' {
+  switch (status) {
+    case 'reconciled':
+    case 'matched':
+      return 'success';
+    case 'submitted':
+      return 'info';
+    case 'over':
+      return 'warning';
+    case 'short':
+      return 'danger';
+    default:
+      return 'muted';
+  }
+}
+
 function FundingPage() {
   const { data: periods, isLoading: periodsLoading } = usePeriods();
-  const { data: claims, isLoading: claimsLoading } = useClaims();
+  const { data: allClaims, isLoading: claimsLoading } = useClaims();
+  const { data: children } = useChildren();
   const deletePeriod = useDeletePeriod();
   const deleteClaim = useDeleteClaim();
 
+  const [selectedPeriodId, setSelectedPeriodId] = useState<number | null>(null);
   const [periodModal, setPeriodModal] = useState(false);
   const [editingPeriod, setEditingPeriod] = useState<FundingPeriod | null>(null);
   const [claimModal, setClaimModal] = useState(false);
   const [editingClaim, setEditingClaim] = useState<FundingClaim | null>(null);
 
-  const periodLabel = useMemo(() => {
-    const map = new Map<number, string>();
-    for (const p of periods ?? []) map.set(p.id, p.label);
-    return map;
-  }, [periods]);
+  // Default the selector to the first (most recent) period once loaded.
+  const activePeriodId =
+    selectedPeriodId ?? (periods && periods.length > 0 ? periods[0].id : null);
+  const activePeriod = useMemo(
+    () => (periods ?? []).find((p) => p.id === activePeriodId) ?? null,
+    [periods, activePeriodId],
+  );
+
+  // Claims scoped to the selected period (the API can filter by ?periodId, but
+  // useClaims() fetches all; filter client-side to avoid a new hook).
+  const claims = useMemo(
+    () => (allClaims ?? []).filter((c) => c.funding_period_id === activePeriodId),
+    [allClaims, activePeriodId],
+  );
+
+  const totalClaimed = claims.reduce((s, c) => s + (Number(c.claimed_hours) || 0), 0);
+  const totalExpected = claims.reduce((s, c) => s + (Number(c.expected_hours) || 0), 0);
+  const variance = totalClaimed - totalExpected;
+  // A claim is a discrepancy when claimed != expected hours.
+  const discrepancies = claims.filter(
+    (c) => (Number(c.claimed_hours) || 0) !== (Number(c.expected_hours) || 0),
+  );
+
+  const childName = (cl: FundingClaim) =>
+    cl.child_name || children?.find((ch) => ch.id === cl.child_id)?.name || '—';
 
   return (
-    <div className="space-y-8 p-6">
+    <div className="space-y-4 p-6">
       <h1 className="text-2xl font-semibold text-gray-900">Funding Reconciliation</h1>
 
-      {/* Periods */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">Funding periods</h2>
-          <button
-            className="btn-primary"
-            onClick={() => {
-              setEditingPeriod(null);
-              setPeriodModal(true);
-            }}
-          >
-            Add period
-          </button>
+      {/* Period selector + actions */}
+      <div className="card">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <label className="text-xs font-bold text-muted">Period</label>
+            <select
+              className="input w-auto"
+              value={activePeriodId ?? ''}
+              onChange={(e) => setSelectedPeriodId(e.target.value ? Number(e.target.value) : null)}
+              disabled={periodsLoading || (periods ?? []).length === 0}
+            >
+              <option value="">— Select period —</option>
+              {(periods ?? []).map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label} ({p.start_date} – {p.end_date})
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              className="btn-outline btn-sm"
+              onClick={() => {
+                setEditingPeriod(null);
+                setPeriodModal(true);
+              }}
+            >
+              + New period
+            </button>
+            {activePeriod && (
+              <button
+                className="btn-outline btn-sm"
+                onClick={() => {
+                  setEditingPeriod(activePeriod);
+                  setPeriodModal(true);
+                }}
+              >
+                Edit period
+              </button>
+            )}
+            {activePeriod && (
+              <button
+                className="btn-outline btn-sm text-danger"
+                onClick={() => {
+                  if (confirm(`Delete ${activePeriod.label}?`)) {
+                    deletePeriod.mutate(activePeriod.id);
+                    setSelectedPeriodId(null);
+                  }
+                }}
+              >
+                Delete period
+              </button>
+            )}
+            {activePeriod && (
+              <button
+                className="btn-primary btn-sm"
+                onClick={() => {
+                  setEditingClaim(null);
+                  setClaimModal(true);
+                }}
+              >
+                + Add claim
+              </button>
+            )}
+          </div>
         </div>
+      </div>
 
-        {periodsLoading ? (
-          <Spinner />
-        ) : (periods ?? []).length === 0 ? (
-          <EmptyState title="No funding periods" description="Add a funding period to get started." />
-        ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {(periods ?? []).map((p) => (
-              <div key={p.id} className="rounded-xl border border-border bg-surface p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className="font-semibold text-gray-900">{p.label}</h3>
-                  <div className="flex gap-2">
-                    <button
-                      className="text-sm text-primary"
-                      onClick={() => {
-                        setEditingPeriod(p);
-                        setPeriodModal(true);
-                      }}
+      {periodsLoading ? (
+        <Spinner />
+      ) : (periods ?? []).length === 0 ? (
+        <EmptyState
+          title="No funding periods yet"
+          description='Click "+ New period" to create one (e.g. "Autumn Term 2026").'
+        />
+      ) : !activePeriod ? (
+        <EmptyState title="Select a period" description="Choose a funding period to view claims." />
+      ) : (
+        <>
+          {/* Stat cards */}
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <StatCard label="Claimed hours" value={totalClaimed} />
+            <StatCard label="Expected hours" value={totalExpected} />
+            <StatCard
+              label="Variance"
+              value={`${variance > 0 ? '+' : ''}${variance}`}
+              hint={variance === 0 ? 'Balanced' : variance < 0 ? 'Under-claimed' : 'Over-claimed'}
+            />
+            <StatCard label="Discrepancies" value={discrepancies.length} />
+          </div>
+
+          {/* Discrepancies callout */}
+          {discrepancies.length > 0 && (
+            <div className="card border-l-[3px] border-l-danger">
+              <h2 className="mb-2 text-base font-semibold text-gray-900">⚠️ Discrepancies</h2>
+              <div className="space-y-1">
+                {discrepancies.map((c) => {
+                  const diff = (Number(c.claimed_hours) || 0) - (Number(c.expected_hours) || 0);
+                  return (
+                    <div
+                      key={c.id}
+                      className="flex flex-wrap items-center justify-between gap-2 border-b border-border py-1.5 text-sm last:border-0"
                     >
-                      Edit
-                    </button>
-                    <button
-                      className="text-sm text-danger"
-                      onClick={() => {
-                        if (confirm(`Delete ${p.label}?`)) deletePeriod.mutate(p.id);
-                      }}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-                <p className="mt-1 text-sm text-muted">
-                  {p.start_date} → {p.end_date}
-                </p>
+                      <span className="font-medium text-gray-900">{childName(c)}</span>
+                      <span className="text-muted">
+                        Claimed {c.claimed_hours}h, expected {c.expected_hours}h (
+                        {diff < 0 ? 'short by' : 'over by'} {Math.abs(diff)}h)
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
-          </div>
-        )}
-      </section>
+            </div>
+          )}
 
-      {/* Claims */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">Claims</h2>
-          <button
-            className="btn-primary"
-            onClick={() => {
-              setEditingClaim(null);
-              setClaimModal(true);
-            }}
-          >
-            Add claim
-          </button>
-        </div>
+          {/* Claims table */}
+          <section className="space-y-3">
+            <h2 className="text-lg font-semibold text-gray-900">Claims — {activePeriod.label}</h2>
+            {claimsLoading ? (
+              <Spinner />
+            ) : claims.length === 0 ? (
+              <EmptyState
+                title="No claims for this period yet"
+                description='Use "+ Add claim" to record a child’s claimed vs expected hours.'
+              />
+            ) : (
+              <div className="overflow-hidden rounded-xl border border-border bg-surface">
+                <table className="w-full text-sm">
+                  <thead className="border-b border-border text-left text-muted">
+                    <tr>
+                      <th className="px-4 py-2 font-medium">Child</th>
+                      <th className="px-4 py-2 font-medium">Claimed</th>
+                      <th className="px-4 py-2 font-medium">Expected</th>
+                      <th className="px-4 py-2 font-medium">Status</th>
+                      <th className="px-4 py-2" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {claims.map((cl) => (
+                      <tr key={cl.id} className="border-b border-border last:border-0">
+                        <td className="px-4 py-2 font-medium text-gray-900">{childName(cl)}</td>
+                        <td className="px-4 py-2 text-muted">{cl.claimed_hours}</td>
+                        <td className="px-4 py-2 text-muted">{cl.expected_hours}</td>
+                        <td className="px-4 py-2">
+                          <Badge variant={statusVariant(cl.status)}>{cl.status}</Badge>
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          <div className="flex justify-end gap-2">
+                            <button
+                              className="btn-outline btn-sm"
+                              onClick={() => {
+                                setEditingClaim(cl);
+                                setClaimModal(true);
+                              }}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="btn-outline btn-sm text-danger"
+                              onClick={() => {
+                                if (confirm('Delete this claim?')) deleteClaim.mutate(cl.id);
+                              }}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        </>
+      )}
 
-        {claimsLoading ? (
-          <Spinner />
-        ) : (claims ?? []).length === 0 ? (
-          <EmptyState title="No claims" description="Add a claim to get started." />
-        ) : (
-          <div className="overflow-hidden rounded-xl border border-border bg-surface">
-            <table className="w-full text-sm">
-              <thead className="border-b border-border text-left text-muted">
-                <tr>
-                  <th className="px-4 py-2 font-medium">Child</th>
-                  <th className="px-4 py-2 font-medium">Period</th>
-                  <th className="px-4 py-2 font-medium">Claimed</th>
-                  <th className="px-4 py-2 font-medium">Expected</th>
-                  <th className="px-4 py-2 font-medium">Status</th>
-                  <th className="px-4 py-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {(claims ?? []).map((cl) => (
-                  <tr key={cl.id} className="border-b border-border last:border-0">
-                    <td className="px-4 py-2 text-gray-900">{cl.child_name || '—'}</td>
-                    <td className="px-4 py-2 text-muted">
-                      {periodLabel.get(cl.funding_period_id) ?? `#${cl.funding_period_id}`}
-                    </td>
-                    <td className="px-4 py-2 text-muted">{cl.claimed_hours}</td>
-                    <td className="px-4 py-2 text-muted">{cl.expected_hours}</td>
-                    <td className="px-4 py-2">
-                      <Badge variant={cl.status === 'submitted' ? 'success' : 'muted'}>
-                        {cl.status}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-2 text-right">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          className="text-sm text-primary"
-                          onClick={() => {
-                            setEditingClaim(cl);
-                            setClaimModal(true);
-                          }}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          className="text-sm text-danger"
-                          onClick={() => {
-                            if (confirm('Delete this claim?')) deleteClaim.mutate(cl.id);
-                          }}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      <PeriodModal
-        open={periodModal}
-        editing={editingPeriod}
-        onClose={() => setPeriodModal(false)}
-      />
+      <PeriodModal open={periodModal} editing={editingPeriod} onClose={() => setPeriodModal(false)} />
       <ClaimModal
         open={claimModal}
         editing={editingClaim}
-        periods={periods ?? []}
+        defaultPeriodId={activePeriodId}
         onClose={() => setClaimModal(false)}
       />
     </div>
@@ -222,10 +307,20 @@ function PeriodModal({
   };
 
   return (
-    <Modal open={open} onClose={onClose} title={editing ? `Edit ${editing.label}` : 'Add period'}>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={editing ? `Edit ${editing.label}` : 'New funding period'}
+    >
       <form onSubmit={submit} className="space-y-4">
-        <Field label="Label">
-          <input value={label} onChange={(e) => setLabel(e.target.value)} className="input" required />
+        <Field label="Name">
+          <input
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            className="input"
+            placeholder="e.g. Autumn Term 2026"
+            required
+          />
         </Field>
         <div className="grid grid-cols-2 gap-4">
           <Field label="Start date">
@@ -260,14 +355,15 @@ function PeriodModal({
 function ClaimModal({
   open,
   editing,
-  periods,
+  defaultPeriodId,
   onClose,
 }: {
   open: boolean;
   editing: FundingClaim | null;
-  periods: FundingPeriod[];
+  defaultPeriodId: number | null;
   onClose: () => void;
 }) {
+  const { data: periods } = usePeriods();
   const { data: children } = useChildren();
   const createClaim = useCreateClaim();
   const updateClaim = useUpdateClaim(editing?.id ?? 0);
@@ -282,7 +378,7 @@ function ClaimModal({
   const key = `${open}-${editing?.id ?? 'new'}`;
   if (key !== seedKey) {
     setSeedKey(key);
-    setFundingPeriodId(editing?.funding_period_id ?? '');
+    setFundingPeriodId(editing?.funding_period_id ?? defaultPeriodId ?? '');
     setChildId(editing?.child_id ?? '');
     setClaimedHours(String(editing?.claimed_hours ?? 0));
     setExpectedHours(String(editing?.expected_hours ?? 0));
@@ -290,6 +386,7 @@ function ClaimModal({
   }
 
   const submitting = editing ? updateClaim.isPending : createClaim.isPending;
+  const activeChildren = (children ?? []).filter((c) => c.status === 'Active');
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -309,7 +406,7 @@ function ClaimModal({
   };
 
   return (
-    <Modal open={open} onClose={onClose} title={editing ? 'Edit claim' : 'Add claim'}>
+    <Modal open={open} onClose={onClose} title={editing ? 'Edit claim' : 'Add funding claim'}>
       <form onSubmit={submit} className="space-y-4">
         <Field label="Funding period">
           <select
@@ -319,7 +416,7 @@ function ClaimModal({
             required
           >
             <option value="">Select a period…</option>
-            {periods.map((p) => (
+            {(periods ?? []).map((p) => (
               <option key={p.id} value={p.id}>
                 {p.label}
               </option>
@@ -333,13 +430,14 @@ function ClaimModal({
             className="input"
           >
             <option value="">No child</option>
-            {(children ?? []).map((c) => (
+            {activeChildren.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
             ))}
           </select>
         </Field>
+        {/* TODO: needs claim `type` (LA / TFC) field — not in funding_claims schema (apps/api/src/routes/funding.ts). */}
         <div className="grid grid-cols-2 gap-4">
           <Field label="Claimed hours">
             <input
@@ -362,6 +460,7 @@ function ClaimModal({
             />
           </Field>
         </div>
+        {/* TODO: reference also captures received_date / reference / notes / £ amounts — funding_claims is hours-only. */}
         <Field label="Status">
           <select value={status} onChange={(e) => setStatus(e.target.value)} className="input">
             <option value="draft">draft</option>

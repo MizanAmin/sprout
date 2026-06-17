@@ -50,13 +50,13 @@ Legend: ✅ matches · 🟡 exists, needs re-skin/feature pass · ⬜ not starte
 | 29 | Staff Development | `/staff-dev` | ✅ |
 | 30 | Invoices | `/invoices` | ✅ |
 | 31 | Finance | `/finance` | ✅ |
-| 32 | Revenue Report | `/revenue-report` | 🟡 |
-| 33 | Funded Hours Report | `/funded-hours` | 🟡 |
-| 34 | Funding Reconciliation | `/funding` | 🟡 |
-| 35 | Reports | `/reports` | 🟡 |
-| 36 | Settings | `/settings` | 🟡 |
-| 37 | Staff Accounts | `/users` | 🟡 |
-| 38 | Subscription & Billing | `/billing` | 🟡 |
+| 32 | Revenue Report | `/revenue-report` | ✅ |
+| 33 | Funded Hours Report | `/funded-hours` | ✅ |
+| 34 | Funding Reconciliation | `/funding` | ✅ |
+| 35 | Reports | `/reports` | ✅ |
+| 36 | Settings | `/settings` | ✅ |
+| 37 | Staff Accounts | `/users` | ✅ |
+| 38 | Subscription & Billing | `/billing` | ✅ |
 
 ## ⏳ Phase 3 — Cross-cutting features (from reference)
 - [ ] Light/Dark theme toggle (reference has `[data-theme="dark"]`)

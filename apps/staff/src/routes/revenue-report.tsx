@@ -1,84 +1,235 @@
+import { useState } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
-import { StatCard, Spinner, EmptyState, gbp } from '../components/ui';
-import {
-  useReportsOverview,
-  useChildrenByRoom,
-  useFinanceSummary,
-} from '../features/reports/useReports';
+import { StatCard, Spinner, EmptyState, Badge, gbp } from '../components/ui';
+import { useRevenue, type RevenueReport } from '../features/finance/useFinance';
 
 export const Route = createFileRoute('/revenue-report')({
   component: RevenueReportPage,
 });
 
-function RevenueReportPage() {
-  const overview = useReportsOverview();
-  const finance = useFinanceSummary();
-  const byRoom = useChildrenByRoom();
+const PERIODS = ['3M', '6M', '12M', '24M'] as const;
+type Period = (typeof PERIODS)[number];
 
-  const rooms = byRoom.data ?? [];
+function RevenueReportPage() {
+  const [period, setPeriod] = useState<Period>('12M');
+  const revenue = useRevenue(period);
 
   return (
     <div className="space-y-4 p-6">
-      <h1 className="text-2xl font-semibold text-gray-900">Revenue Report</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold text-gray-900">Revenue Report</h1>
+        <div className="flex gap-1.5">
+          {PERIODS.map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => setPeriod(p)}
+              className={
+                p === period
+                  ? 'btn-primary px-3 py-1.5 text-sm'
+                  : 'btn-outline px-3 py-1.5 text-sm'
+              }
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+      </div>
 
-      <p className="text-sm text-muted">Financial overview and headline figures.</p>
+      <p className="text-sm text-muted">
+        Monthly income, debt aging and outstanding balances by child.
+      </p>
 
+      {revenue.isLoading ? (
+        <Spinner />
+      ) : !revenue.data ? (
+        <EmptyState title="No revenue data" description="Could not load the revenue report." />
+      ) : (
+        <RevenueContent report={revenue.data} period={period} />
+      )}
+    </div>
+  );
+}
+
+function RevenueContent({ report, period }: { report: RevenueReport; period: Period }) {
+  const { kpis, monthly, aging, byChild } = report;
+  const collectionTone =
+    kpis.collectionRate >= 90
+      ? 'text-success'
+      : kpis.collectionRate >= 70
+        ? 'text-warning'
+        : 'text-danger';
+
+  return (
+    <>
+      {/* KPI row */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Collected" value={finance.data ? gbp(finance.data.collected) : '—'} />
-        <StatCard label="Pending" value={finance.data ? gbp(finance.data.pending) : '—'} />
+        <StatCard label="Total invoiced" value={gbp(kpis.totalInvoiced)} hint={`Last ${period}`} />
         <StatCard
-          label="Overdue"
-          value={
-            finance.data ? (
-              <span className={finance.data.overdue > 0 ? 'text-danger' : undefined}>
-                {gbp(finance.data.overdue)}
-              </span>
-            ) : (
-              '—'
-            )
-          }
+          label="Collected"
+          value={<span className="text-success">{gbp(kpis.collected)}</span>}
+          hint="Amount paid"
         />
         <StatCard
           label="Collection rate"
-          value={finance.data ? `${finance.data.collectionRate}%` : '—'}
+          value={<span className={collectionTone}>{kpis.collectionRate}%</span>}
         />
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Active children" value={overview.data?.activeChildren ?? '—'} />
         <StatCard
-          label="Attendance today"
-          value={overview.data ? `${overview.data.attendanceTodayPct}%` : '—'}
+          label="Outstanding"
+          value={
+            <span className={kpis.outstanding > 0 ? 'text-warning' : undefined}>
+              {gbp(kpis.outstanding)}
+            </span>
+          }
+          hint={`${gbp(kpis.avgPerChild)} avg per child`}
         />
-        <StatCard label="Activities (30d)" value={overview.data?.activities30d ?? '—'} />
-        <StatCard label="Avg EYFS score" value={overview.data?.avgEyfsScore ?? '—'} />
       </div>
 
-      <section className="rounded-xl border border-border bg-surface p-4">
-        <h2 className="mb-3 font-semibold text-gray-900">Active children by room</h2>
-        {byRoom.isLoading ? (
-          <Spinner />
-        ) : rooms.length === 0 ? (
-          <EmptyState title="No rooms" description="No active children grouped by room." />
-        ) : (
+      {/* Monthly income bar chart */}
+      <MonthlyChart monthly={monthly} />
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <AgingBreakdown aging={aging} />
+        <ByChildTable byChild={byChild} />
+      </div>
+    </>
+  );
+}
+
+function MonthlyChart({ monthly }: { monthly: RevenueReport['monthly'] }) {
+  const maxVal = Math.max(...monthly.map((m) => m.invoiced), 1);
+
+  return (
+    <section className="card">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="font-semibold text-gray-900">Monthly income</h2>
+        <div className="flex items-center gap-3 text-xs text-muted">
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-success" />
+            Collected
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="inline-block h-2.5 w-2.5 rounded-sm bg-warning" />
+            Outstanding
+          </span>
+        </div>
+      </div>
+
+      {monthly.length === 0 ? (
+        <EmptyState title="No invoice data" description="No invoices for this period." />
+      ) : (
+        <div className="flex h-48 items-end gap-2">
+          {monthly.map((m) => {
+            const outstanding = Math.max(m.invoiced - m.collected, 0);
+            const collectedPct = (m.collected / maxVal) * 100;
+            const outstandingPct = (outstanding / maxVal) * 100;
+            const label = formatMonth(m.month);
+            return (
+              <div key={m.month} className="flex flex-1 flex-col items-center gap-1">
+                <div
+                  className="flex w-full flex-col justify-end"
+                  style={{ height: '100%' }}
+                  title={`${label}: ${gbp(m.invoiced)} invoiced · ${gbp(m.collected)} collected · ${gbp(outstanding)} outstanding`}
+                >
+                  {outstandingPct > 0 && (
+                    <div
+                      className="w-full rounded-t-sm bg-warning"
+                      style={{ height: `${outstandingPct}%` }}
+                    />
+                  )}
+                  <div
+                    className={`w-full bg-success ${outstandingPct > 0 ? '' : 'rounded-t-sm'}`}
+                    style={{ height: `${collectedPct}%` }}
+                  />
+                </div>
+                <span className="text-[10px] text-muted">{label}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function AgingBreakdown({ aging }: { aging: RevenueReport['aging'] }) {
+  const rows: { label: string; value: number; tone: string }[] = [
+    { label: '0–30 days', value: aging.d0_30, tone: 'bg-info' },
+    { label: '31–60 days', value: aging.d31_60, tone: 'bg-warning' },
+    { label: '61–90 days', value: aging.d61_90, tone: 'bg-warning' },
+    { label: '90+ days', value: aging.d90_plus, tone: 'bg-danger' },
+  ];
+  const total = rows.reduce((sum, r) => sum + r.value, 0);
+
+  return (
+    <section className="card">
+      <h2 className="mb-4 font-semibold text-gray-900">Debt aging</h2>
+      {total === 0 ? (
+        <EmptyState title="No outstanding debt" description="Nothing currently overdue." />
+      ) : (
+        <div className="space-y-3">
+          {rows.map((r) => {
+            const pct = total > 0 ? Math.round((r.value / total) * 100) : 0;
+            return (
+              <div key={r.label} className="flex items-center gap-3">
+                <span className="w-24 flex-shrink-0 text-xs text-muted">{r.label}</span>
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-border">
+                  <div className={`h-full rounded-full ${r.tone}`} style={{ width: `${pct}%` }} />
+                </div>
+                <span className="w-20 text-right text-sm font-semibold text-gray-900">
+                  {gbp(r.value)}
+                </span>
+                <span className="w-8 text-right text-xs text-muted">{pct}%</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ByChildTable({ byChild }: { byChild: RevenueReport['byChild'] }) {
+  return (
+    <section className="card">
+      <h2 className="mb-3 font-semibold text-gray-900">Outstanding by child</h2>
+      {byChild.length === 0 ? (
+        <EmptyState title="All settled" description="No outstanding balances by child." />
+      ) : (
+        <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-muted">
-                <th className="py-2 font-medium">Room</th>
-                <th className="py-2 text-right font-medium">Children</th>
+                <th className="py-2 font-medium">Child</th>
+                <th className="py-2 text-right font-medium">Outstanding</th>
               </tr>
             </thead>
             <tbody>
-              {rooms.map((r) => (
-                <tr key={r.room} className="border-b border-border last:border-0">
-                  <td className="py-2 text-gray-900">{r.room || '—'}</td>
-                  <td className="py-2 text-right text-gray-900">{r.count}</td>
+              {byChild.map((c) => (
+                <tr key={c.child_id} className="border-b border-border last:border-0">
+                  <td className="py-2 text-gray-900">{c.child_name}</td>
+                  <td className="py-2 text-right">
+                    <Badge
+                      variant={
+                        c.outstanding > 300 ? 'danger' : c.outstanding > 100 ? 'warning' : 'muted'
+                      }
+                    >
+                      {gbp(c.outstanding)}
+                    </Badge>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        )}
-      </section>
-    </div>
+        </div>
+      )}
+    </section>
   );
+}
+
+// month is 'YYYY-MM' from the API.
+function formatMonth(month: string): string {
+  const d = new Date(`${month}-02`);
+  if (Number.isNaN(d.getTime())) return month;
+  return d.toLocaleString('en-GB', { month: 'short' });
 }
