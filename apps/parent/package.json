@@ -38,6 +38,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@expo/ngrok": "^4.1.0",
     "@sprout/config": "workspace:*",
     "@types/react": "~18.3.12",
     "tailwindcss": "^3.4.17",

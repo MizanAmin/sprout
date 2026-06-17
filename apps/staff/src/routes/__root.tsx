@@ -88,7 +88,7 @@ function RootShell() {
             <Link
               key={item.to}
               to={item.to}
-              className="block rounded-md px-3 py-2 text-sm text-white/80 hover:bg-white/10 hover:text-white [&.active]:bg-white/15 [&.active]:text-white"
+              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-white/55 transition hover:bg-sidebar-hover hover:text-white/90 [&.active]:bg-sidebar-active [&.active]:font-semibold [&.active]:text-indigo-300"
             >
               {item.label}
             </Link>
