@@ -14,6 +14,7 @@ import {
   type PolicyCreateInput,
 } from '../../features/compliance/useCompliance';
 import { Modal, Field, Spinner, EmptyState, Badge, StatCard } from '../../components/ui';
+import { UpgradeNotice, isPlanError } from '../../components/UpgradeNotice';
 
 export const Route = createFileRoute('/compliance/')({
   component: CompliancePage,
@@ -60,9 +61,18 @@ function countOverdue(rows: { next_review: string | null }[]): number {
 }
 
 function CompliancePage() {
-  const { data: policies, isLoading: policiesLoading } = usePolicies();
-  const { data: riskAssessments, isLoading: rasLoading } = useRiskAssessments();
+  const { data: policies, isLoading: policiesLoading, error: policiesError } = usePolicies();
+  const { data: riskAssessments, isLoading: rasLoading, error: rasError } = useRiskAssessments();
   const { data: training, isLoading: trainingLoading } = useTraining();
+
+  if (isPlanError(policiesError) || isPlanError(rasError)) {
+    return (
+      <div className="space-y-4 p-6">
+        <h1 className="text-2xl font-semibold text-gray-900">Compliance Hub</h1>
+        <UpgradeNotice feature="Compliance Hub" />
+      </div>
+    );
+  }
 
   const [addPolicyOpen, setAddPolicyOpen] = useState(false);
 

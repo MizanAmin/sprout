@@ -25,9 +25,12 @@ const queryClient = new QueryClient({
         if (error?.code === 'UNAUTHORIZED') {
           supabase.auth.signOut();
           router.navigate({ to: '/login' });
-        } else if (error?.code === 'TRIAL_EXPIRED' || error?.code === 'PLAN_UPGRADE_REQUIRED') {
+        } else if (error?.code === 'TRIAL_EXPIRED') {
+          // Trial expiry blocks the whole app, so push to billing.
           router.navigate({ to: '/billing' });
         }
+        // PLAN_UPGRADE_REQUIRED is per-feature — pages show an inline upgrade
+        // notice (see UpgradeNotice) rather than a jarring redirect.
       },
     },
   },
@@ -41,9 +44,10 @@ queryClient.getQueryCache().subscribe((event) => {
   if (error?.code === 'UNAUTHORIZED') {
     supabase.auth.signOut();
     router.navigate({ to: '/login' });
-  } else if (error?.code === 'TRIAL_EXPIRED' || error?.code === 'PLAN_UPGRADE_REQUIRED') {
+  } else if (error?.code === 'TRIAL_EXPIRED') {
     router.navigate({ to: '/billing' });
   }
+  // PLAN_UPGRADE_REQUIRED handled inline per-page via <UpgradeNotice>.
 });
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

@@ -16,6 +16,7 @@ import {
 } from '../features/staff-dev/useStaffDev';
 import { useStaff } from '../features/staff/useStaff';
 import { Modal, Field, Spinner, EmptyState, Badge, StatCard } from '../components/ui';
+import { UpgradeNotice, isPlanError } from '../components/UpgradeNotice';
 
 export const Route = createFileRoute('/staff-dev')({
   component: StaffDevPage,
@@ -59,8 +60,17 @@ function fmtDate(d: string | null): string {
 }
 
 function StaffDevPage() {
-  const { data: training, isLoading: trainingLoading } = useTraining();
-  const { data: appraisals, isLoading: appraisalsLoading } = useAppraisals();
+  const { data: training, isLoading: trainingLoading, error: trainingError } = useTraining();
+  const { data: appraisals, isLoading: appraisalsLoading, error: appraisalsError } = useAppraisals();
+
+  if (isPlanError(trainingError) || isPlanError(appraisalsError)) {
+    return (
+      <div className="space-y-4 p-6">
+        <h1 className="text-2xl font-semibold text-gray-900">Staff Development</h1>
+        <UpgradeNotice feature="Staff Development" />
+      </div>
+    );
+  }
   const deleteTraining = useDeleteTraining();
   const deleteAppraisal = useDeleteAppraisal();
 
