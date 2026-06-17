@@ -1,8 +1,10 @@
-# Railway config for the API service.
+# Railway config shared by BOTH backend services (API + jobs worker).
 # Lives at the repo root so the Docker build context is the whole pnpm workspace
-# (the API Dockerfile copies packages/* + apps/api). The staff static site and
-# the jobs worker are separate Railway services in the same project, configured
-# in the Railway dashboard (or their own config) — this file is the API service.
+# (the API Dockerfile copies packages/* + apps/api). Both services build the same
+# image; the worker service just sets START_FILE=src/worker.ts (Dockerfile CMD) so
+# it runs the jobs loop instead of the HTTP API. The worker also serves /health,
+# so the healthcheck below works for it too. The staff static site is a separate
+# Railway service (Vite build) configured in the dashboard.
 [build]
 builder = "dockerfile"
 dockerfilePath = "apps/api/Dockerfile"

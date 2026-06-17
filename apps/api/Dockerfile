@@ -35,4 +35,6 @@ WORKDIR /app/apps/api
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s \
   CMD curl -fsS "http://localhost:${PORT:-3000}/health" || exit 1
-CMD ["bun", "run", "src/index.ts"]
+# One image serves both Railway services: the API (default) and the jobs worker.
+# The worker service sets START_FILE=src/worker.ts; everything else is identical.
+CMD ["sh", "-c", "bun run ${START_FILE:-src/index.ts}"]

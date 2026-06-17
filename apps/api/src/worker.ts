@@ -29,8 +29,26 @@ async function runOnce(): Promise<void> {
   await safeRun('backup', runBackup);
 }
 
+// Tiny health server so the platform healthcheck (railway.toml → /health) passes
+// for the worker too — it shares the API image. No business routes here.
+function startHealthServer(): void {
+  Bun.serve({
+    port: Number(process.env.PORT) || 3000,
+    fetch(req) {
+      const { pathname } = new URL(req.url);
+      if (pathname === '/health') {
+        return new Response(JSON.stringify({ ok: true, worker: true }), {
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+      return new Response('not found', { status: 404 });
+    },
+  });
+}
+
 async function main(): Promise<void> {
   console.log('[worker] starting…');
+  startHealthServer();
   if (process.env.RUN_JOBS_ON_START !== 'false') {
     await runOnce();
   }
