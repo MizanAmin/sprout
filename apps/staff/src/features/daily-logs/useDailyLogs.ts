@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { DailyLogCreateInput } from '@sprout/schemas';
+import type { DailyLogCreateInput, DailyLogUpdateInput } from '@sprout/schemas';
 import { api } from '../../api';
 
 // Daily log row as returned by the API (snake_case from the DB).
@@ -45,6 +45,15 @@ export function useCreateDailyLog() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: DailyLogCreateInput) => api.post<DailyLog>('/daily-logs', data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: dailyLogKeys.all }),
+  });
+}
+
+export function useUpdateDailyLog() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: DailyLogUpdateInput }) =>
+      api.patch<DailyLog>(`/daily-logs/${id}`, data),
     onSuccess: () => qc.invalidateQueries({ queryKey: dailyLogKeys.all }),
   });
 }

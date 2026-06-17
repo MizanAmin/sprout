@@ -19,8 +19,8 @@ Legend: ✅ matches · 🟡 exists, needs re-skin/feature pass · ⬜ not starte
 
 | # | Page | Route | Status |
 |---|------|-------|--------|
-| 1 | Dashboard | `/dashboard` | 🟡 |
-| 2 | Children | `/children` | 🟡 |
+| 1 | Dashboard | `/dashboard` | ✅ |
+| 2 | Children | `/children` | ✅ |
 | 3 | Relatives | `/relatives` | 🟡 |
 | 4 | Staff | `/staff` | 🟡 |
 | 5 | Enquiries | `/enquiries` | 🟡 |
@@ -32,11 +32,11 @@ Legend: ✅ matches · 🟡 exists, needs re-skin/feature pass · ⬜ not starte
 | 11 | Sessions & Funding | `/sessions` | 🟡 |
 | 12 | Planning | `/planning` | 🟡 |
 | 13 | Monitoring | `/monitoring` | 🟡 |
-| 14 | Live Register | `/register` | 🟡 |
+| 14 | Live Register | `/register` | ✅ |
 | 15 | Fire Register | `/fire-register` | 🟡 |
 | 16 | Calendar | `/calendar` | 🟡 |
 | 17 | Assessment | `/assessment` | 🟡 |
-| 18 | Daily Logs | `/daily-logs` | 🟡 |
+| 18 | Daily Logs | `/daily-logs` | ✅ |
 | 19 | Learning Journal | `/journal` | 🟡 |
 | 20 | Reflections | `/reflections` | 🟡 |
 | 21 | SEND | `/send` | 🟡 |
@@ -49,7 +49,7 @@ Legend: ✅ matches · 🟡 exists, needs re-skin/feature pass · ⬜ not starte
 | 28 | GDPR | `/gdpr` | 🟡 |
 | 29 | Staff Development | `/staff-dev` | 🟡 |
 | 30 | Invoices | `/invoices` | 🟡 |
-| 31 | Finance | `/finance` | 🟡 |
+| 31 | Finance | `/finance` | ✅ |
 | 32 | Revenue Report | `/revenue-report` | 🟡 |
 | 33 | Funded Hours Report | `/funded-hours` | 🟡 |
 | 34 | Funding Reconciliation | `/funding` | 🟡 |
