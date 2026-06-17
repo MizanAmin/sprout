@@ -28,7 +28,12 @@
       "metro-symbolicate": "~0.81.0",
       "metro-transform-plugins": "~0.81.0",
       "metro-transform-worker": "~0.81.0",
-      "metro-minify-terser": "~0.81.0"
+      "metro-minify-terser": "~0.81.0",
+      "nativewind": "4.1.23",
+      "react-native-css-interop": "0.1.22",
+      "react-native": "0.76.9",
+      "react": "18.3.1",
+      "react-dom": "18.3.1"
     }
   },
   "devDependencies": {
