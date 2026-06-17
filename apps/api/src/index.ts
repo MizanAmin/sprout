@@ -30,6 +30,7 @@ import childDocuments from './routes/child-documents';
 import reflections from './routes/reflections';
 import childSessions from './routes/child-sessions';
 import fireRegister from './routes/fire-register';
+import uploads from './routes/uploads';
 import children from './routes/children';
 import relatives from './routes/relatives';
 import rooms from './routes/rooms';
@@ -141,5 +142,6 @@ app.route('/api/child-documents', childDocuments);
 app.route('/api/reflections', reflections);
 app.route('/api/child-sessions', childSessions);
 app.route('/api/fire-register', fireRegister);
+app.route('/api/uploads', uploads);
 
 export default { port: process.env.PORT || 3000, fetch: app.fetch };

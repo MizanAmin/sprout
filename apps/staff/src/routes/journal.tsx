@@ -16,6 +16,8 @@ import {
   type Observation,
 } from '../features/observations/useObservations';
 import { Field, Modal, Badge, Spinner, EmptyState } from '../components/ui';
+import { useUpload } from '../features/uploads/useUpload';
+import { SignedImage } from '../components/SignedImage';
 
 export const Route = createFileRoute('/journal')({ component: JournalPage });
 
@@ -170,13 +172,21 @@ function ObservationCard({
         </div>
       </div>
 
-      {/* Photo thumbnail if available */}
+      {/* Photo thumbnail if available — external URLs render directly, stored
+          private-bucket paths resolve via a signed URL. */}
       {obs.photo_url ? (
-        <img
-          src={obs.photo_url}
-          alt=""
-          className="mt-3 h-40 w-full rounded-lg object-cover"
-        />
+        obs.photo_url.startsWith('http') ? (
+          <img
+            src={obs.photo_url}
+            alt=""
+            className="mt-3 h-40 w-full rounded-lg object-cover"
+          />
+        ) : (
+          <SignedImage
+            path={obs.photo_url}
+            className="mt-3 h-40 w-full rounded-lg object-cover"
+          />
+        )
       ) : null}
 
       <p className="mt-3 whitespace-pre-wrap text-sm text-gray-900">{obs.text}</p>
@@ -265,10 +275,13 @@ function ObservationForm({
   submitting?: boolean;
 }) {
   const { data: children } = useChildren();
+  const upload = useUpload();
   const {
     register,
     handleSubmit,
     control,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<ObservationCreateInput>({
     resolver: zodResolver(observationCreateSchema),
@@ -284,6 +297,8 @@ function ObservationForm({
       isShared: editing?.is_shared ?? false,
     },
   });
+
+  const watchedPhotoUrl = watch('photoUrl');
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -352,16 +367,36 @@ function ObservationForm({
         <textarea {...register('text')} className="input" rows={4} />
       </Field>
 
-      <Field label="Photo URL" error={errors.photoUrl?.message}>
-        <input
-          type="url"
-          {...register('photoUrl')}
-          className="input"
-          placeholder="https://…"
-        />
+      <Field label="Photo" error={errors.photoUrl?.message}>
+        <div className="space-y-2">
+          <input
+            type="file"
+            accept="image/*"
+            className="input"
+            disabled={upload.isPending}
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              const { path } = await upload.mutateAsync({ file, kind: 'observation' });
+              setValue('photoUrl', path, { shouldDirty: true });
+            }}
+          />
+          {upload.isPending && <p className="text-xs text-muted">Uploading…</p>}
+          {watchedPhotoUrl && !watchedPhotoUrl.startsWith('http') ? (
+            <SignedImage
+              path={watchedPhotoUrl}
+              className="h-24 w-24 rounded-lg object-cover"
+            />
+          ) : null}
+          {/* Manual URL fallback for externally hosted images. */}
+          <input
+            type="url"
+            {...register('photoUrl')}
+            className="input"
+            placeholder="…or paste an image URL"
+          />
+        </div>
       </Field>
-      {/* TODO: needs photo upload endpoint — only an external photo_url can be
-          stored today (no file upload API on observations). */}
 
       <div className="grid grid-cols-2 gap-4">
         <Field label="Practitioner" error={errors.practitioner?.message}>

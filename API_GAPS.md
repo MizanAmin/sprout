@@ -15,7 +15,7 @@
 - **C.** staff pickers + role gating; CSV **export** (children, relatives).
 
 **⏳ Deferred — need infrastructure, not quick slices:**
-- **File storage:** nursery logo upload, observation photo upload (need a storage signed-URL flow; `*_url` columns exist).
+- **File storage** — ✅ done: `POST /uploads` (signed) + `GET /uploads/url` (tenant-scoped signed URLs) on the private bucket; wired to nursery **logo** (Settings) and **observation photos** (Journal) via useUpload/SignedImage.
 - **PDF/print:** Ofsted SEF + report, invoice/revenue PDF/Excel export.
 - **CSV import** (children/relatives) — needs file upload + parse UI.
 - **Auto-invoicing config panel** + job-history/reminder-log + per-invoice payment ledger.

@@ -15,6 +15,8 @@ import {
   type SettingsUpdateInput,
 } from '../features/settings/useSettings';
 import { Field, Spinner, EmptyState, Badge } from '../components/ui';
+import { useUpload } from '../features/uploads/useUpload';
+import { SignedImage } from '../components/SignedImage';
 
 export const Route = createFileRoute('/settings')({
   component: SettingsPage,
@@ -61,17 +63,33 @@ function SettingsPage() {
 function SettingsForm({ settings }: { settings: NurserySettings }) {
   const update = useUpdateSettings();
   const [saved, setSaved] = useState(false);
+  const upload = useUpload();
   const runReminders = useMutation({
     mutationFn: () => api.post<{ sent: number }>('/finance/run-reminders', {}),
   });
   const {
     register,
     handleSubmit,
+    setValue,
+    watch,
     formState: { errors, isDirty },
   } = useForm<SettingsUpdateInput>({
     resolver: zodResolver(settingsUpdateSchema),
     defaultValues: toFormValues(settings),
   });
+
+  // Stored logo: an absolute URL (legacy) renders directly; a storage path is
+  // resolved to a signed URL via <SignedImage>.
+  const logoValue = watch('logoUrl') ?? settings.logo_url ?? '';
+  const isHttpLogo = logoValue.startsWith('http');
+
+  const onLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const { path } = await upload.mutateAsync({ file, kind: 'logo' });
+    setValue('logoUrl', path, { shouldDirty: true });
+    e.target.value = '';
+  };
 
   const onSubmit = (data: SettingsUpdateInput) =>
     update.mutate(data, {
@@ -100,21 +118,34 @@ function SettingsForm({ settings }: { settings: NurserySettings }) {
           {/* ── Left column ───────────────────────────────────── */}
           <div className="space-y-4">
             <Card title="Nursery information">
-              {/* Logo: API exposes logo_url; upload widget needs a file endpoint. */}
+              {/* Logo: upload to the private bucket (stores a path) or paste a URL. */}
               <div className="flex items-center gap-4 border-b border-border pb-4">
                 <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-xl border border-border bg-bg">
-                  {settings.logo_url ? (
-                    <img src={settings.logo_url} alt="Nursery logo" className="h-full w-full object-contain" />
+                  {logoValue ? (
+                    isHttpLogo ? (
+                      <img src={logoValue} alt="Nursery logo" className="h-full w-full object-contain" />
+                    ) : (
+                      <SignedImage path={logoValue} className="h-full w-full object-contain" />
+                    )
                   ) : (
                     <span className="text-2xl">🌱</span>
                   )}
                 </div>
                 <div className="flex-1">
-                  <Field label="Logo URL" error={errors.logoUrl?.message}>
+                  <Field label="Upload logo" error={errors.logoUrl?.message}>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={onLogoChange}
+                      disabled={upload.isPending}
+                      className="input"
+                    />
+                  </Field>
+                  {upload.isPending && <p className="mt-1 text-xs text-muted">Uploading…</p>}
+                  <Field label="Logo URL">
                     <input {...register('logoUrl')} className="input" placeholder="https://…" />
                   </Field>
-                  {/* TODO: needs POST /settings/logo (file upload). API only stores logo_url. */}
-                  <p className="mt-1 text-xs text-muted">Paste a logo URL. File upload not yet available.</p>
+                  <p className="mt-1 text-xs text-muted">Upload an image, or paste a logo URL.</p>
                 </div>
               </div>
 
