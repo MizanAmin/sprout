@@ -1,0 +1,44 @@
+name: Deploy Staff (Cloudflare Pages)
+
+# Cloudflare's Git-connected build can't handle this pnpm monorepo (Wrangler
+# "application detection run in the root of a workspace"), so we build here and
+# push the output to Cloudflare Pages via direct upload — the working approach.
+#
+# Setup: create a Cloudflare API token with the "Cloudflare Pages: Edit"
+# permission and add it as the repo secret CLOUDFLARE_API_TOKEN. The account ID
+# is not secret, so it's inline below. Without the token, the deploy step skips
+# (the build still runs as a check).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/staff/**'
+      - 'packages/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/deploy-staff.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: b3aef530939e1e79e562f925f36876f2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # VITE_* come from the committed apps/staff/.env.production (public config).
+      - run: pnpm --filter @sprout/staff build
+      - name: Deploy to Cloudflare Pages
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        run: npx wrangler@4 pages deploy apps/staff/dist --project-name=sprout-staff --branch=main --commit-dirty=true
+      - name: Skip notice
+        if: ${{ env.CLOUDFLARE_API_TOKEN == '' }}
+        run: echo "CLOUDFLARE_API_TOKEN not set — add it as a repo secret to enable staff auto-deploy (build above still validates)."
