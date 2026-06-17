@@ -43,11 +43,11 @@ Legend: ✅ matches · 🟡 exists, needs re-skin/feature pass · ⬜ not starte
 | 22 | Newsfeed | `/newsfeed` | ✅ |
 | 23 | Medications | `/medications` | ✅ |
 | 24 | Incidents | `/incidents` | ✅ |
-| 25 | Accident Book | `/accident-book` | 🟡 |
-| 26 | Ofsted Mode | `/ofsted` | 🟡 |
-| 27 | Compliance Hub | `/compliance` | 🟡 |
-| 28 | GDPR | `/gdpr` | 🟡 |
-| 29 | Staff Development | `/staff-dev` | 🟡 |
+| 25 | Accident Book | `/accident-book` | ✅ |
+| 26 | Ofsted Mode | `/ofsted` | ✅ |
+| 27 | Compliance Hub | `/compliance` | ✅ |
+| 28 | GDPR | `/gdpr` | ✅ |
+| 29 | Staff Development | `/staff-dev` | ✅ |
 | 30 | Invoices | `/invoices` | ✅ |
 | 31 | Finance | `/finance` | ✅ |
 | 32 | Revenue Report | `/revenue-report` | 🟡 |
