@@ -3,9 +3,13 @@ import type { ReactNode } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useMutation } from '@tanstack/react-query';
+import { api } from '../api';
 import {
   useSettings,
   useUpdateSettings,
+  useGoCardlessSettings,
+  useUpdateGoCardlessSettings,
   settingsUpdateSchema,
   type NurserySettings,
   type SettingsUpdateInput,
@@ -57,6 +61,9 @@ function SettingsPage() {
 function SettingsForm({ settings }: { settings: NurserySettings }) {
   const update = useUpdateSettings();
   const [saved, setSaved] = useState(false);
+  const runReminders = useMutation({
+    mutationFn: () => api.post<{ sent: number }>('/finance/run-reminders', {}),
+  });
   const {
     register,
     handleSubmit,
@@ -245,20 +252,24 @@ function SettingsForm({ settings }: { settings: NurserySettings }) {
               <Field label="From address (optional)" error={errors.smtpFrom?.message}>
                 <input {...register('smtpFrom')} className="input" placeholder="Nursery Name <nursery@example.com>" />
               </Field>
-              {/* TODO: needs POST /finance/run-reminders for a "Run reminders now" action. */}
+              {/* Manually trigger the overdue-invoice reminder job (POST /finance/run-reminders). */}
+              <div className="flex items-center gap-3 border-t border-border pt-4">
+                <button
+                  type="button"
+                  className="btn-outline"
+                  disabled={runReminders.isPending}
+                  onClick={() => runReminders.mutate()}
+                >
+                  {runReminders.isPending ? 'Sending…' : 'Run reminders now'}
+                </button>
+                {runReminders.isSuccess && (
+                  <Badge variant="success">Sent {runReminders.data.sent} reminders</Badge>
+                )}
+                {runReminders.isError && <Badge variant="danger">Failed to send reminders</Badge>}
+              </div>
             </Card>
 
-            <Card
-              title="💳 Online payments (GoCardless)"
-              subtitle="Let parents pay invoices by Direct Debit via your own GoCardless account."
-            >
-              {/* TODO: needs GET/PUT/DELETE /payments/gocardless-settings — not exposed by the settings API. */}
-              <Badge variant="muted">Not connected</Badge>
-              <EmptyState
-                title="GoCardless settings unavailable"
-                description="The API does not expose a GoCardless endpoint yet."
-              />
-            </Card>
+            <GoCardlessCard />
           </div>
         </div>
 
@@ -271,6 +282,86 @@ function SettingsForm({ settings }: { settings: NurserySettings }) {
         </div>
       </div>
     </form>
+  );
+}
+
+/* ── GoCardless connection card ──────────────────────────────
+   Self-contained (its own query + mutation) so its Save button does not submit
+   the surrounding settings form. The raw token is write-only: the API returns
+   only a connected flag + masked hint, never the token itself. */
+function GoCardlessCard() {
+  const { data, isLoading } = useGoCardlessSettings();
+  const update = useUpdateGoCardlessSettings();
+  const [token, setToken] = useState('');
+  const [saved, setSaved] = useState(false);
+
+  const connected = data?.connected ?? false;
+
+  const onSave = () => {
+    update.mutate(token, {
+      onSuccess: () => {
+        setToken('');
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      },
+    });
+  };
+
+  return (
+    <Card
+      title="💳 Online payments (GoCardless)"
+      subtitle="Let parents pay invoices by Direct Debit via your own GoCardless account."
+    >
+      {isLoading ? (
+        <Spinner />
+      ) : (
+        <>
+          <div className="flex items-center gap-2">
+            {connected ? (
+              <>
+                <Badge variant="success">Connected</Badge>
+                {data?.hint && <span className="text-xs text-muted">Token ending {data.hint}</span>}
+              </>
+            ) : (
+              <Badge variant="muted">Not connected</Badge>
+            )}
+          </div>
+
+          <Field label={connected ? 'Replace access token' : 'Access token'}>
+            <input
+              type="password"
+              className="input"
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              placeholder="live_… or sandbox_…"
+              autoComplete="off"
+            />
+          </Field>
+          <p className="text-xs text-muted">
+            Paste your GoCardless access token. It is stored securely and never shown again.
+            {connected && ' Saving an empty token disconnects your account (the platform default is used instead).'}
+          </p>
+
+          <div className="flex items-center gap-3">
+            <button type="button" className="btn-primary" onClick={onSave} disabled={update.isPending}>
+              {update.isPending ? 'Saving…' : connected ? 'Update token' : 'Connect'}
+            </button>
+            {connected && (
+              <button
+                type="button"
+                className="btn-outline"
+                onClick={() => update.mutate('', { onSuccess: () => setToken('') })}
+                disabled={update.isPending}
+              >
+                Disconnect
+              </button>
+            )}
+            {saved && <Badge variant="success">Saved</Badge>}
+            {update.isError && <Badge variant="danger">Save failed</Badge>}
+          </div>
+        </>
+      )}
+    </Card>
   );
 }
 

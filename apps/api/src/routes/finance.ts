@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { requireAuth } from '../middleware/auth';
 import { requireRole } from '../middleware/requireRole';
 import { withTenant } from '../db';
+import { runInvoiceReminders } from '../jobs/invoiceReminders';
 import type { HonoEnv } from '../types';
 
 // Finance dashboards (manager only) — read-only aggregates over invoices.
@@ -142,6 +143,12 @@ app.get('/revenue', async (c) => {
       count: Number(r.count),
     })),
   });
+});
+
+// On-demand trigger for the hourly invoice-reminder job (manager only, gated above).
+app.post('/run-reminders', async (c) => {
+  const result = await runInvoiceReminders();
+  return c.json(result);
 });
 
 export default app;

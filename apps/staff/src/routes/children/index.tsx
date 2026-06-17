@@ -11,6 +11,7 @@ import {
 } from '../../features/children/useChildren';
 import { ChildForm } from '../../features/children/ChildForm';
 import { Modal, Badge, Spinner, EmptyState } from '../../components/ui';
+import { exportCsv } from '../../lib/csv';
 
 export const Route = createFileRoute('/children/')({ component: ChildrenPage });
 
@@ -127,13 +128,40 @@ function ChildrenPage() {
     setModalOpen(true);
   };
 
+  const handleExport = () => {
+    exportCsv(
+      'children.csv',
+      filtered.map((c) => ({
+        name: c.name,
+        dob: c.dob ?? '',
+        gender: c.gender ?? '',
+        room: c.room ?? '',
+        status: c.status ?? '',
+        allergy: hasAllergy(c.allergy) ? c.allergy : '',
+      })),
+      [
+        { key: 'name', label: 'Name' },
+        { key: 'dob', label: 'DOB' },
+        { key: 'gender', label: 'Gender' },
+        { key: 'room', label: 'Room' },
+        { key: 'status', label: 'Status' },
+        { key: 'allergy', label: 'Allergy' },
+      ],
+    );
+  };
+
   return (
     <div className="space-y-4 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-gray-900">Children</h1>
-        <button className="btn-primary" onClick={openAdd}>
-          Add child
-        </button>
+        <div className="flex items-center gap-2">
+          <button className="btn-outline" onClick={handleExport} disabled={filtered.length === 0}>
+            Export CSV
+          </button>
+          <button className="btn-primary" onClick={openAdd}>
+            Add child
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-3">

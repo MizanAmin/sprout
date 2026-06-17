@@ -11,6 +11,7 @@ import {
 import { RelativeForm } from '../features/relatives/RelativeForm';
 import { useChildren, type Child } from '../features/children/useChildren';
 import { Modal, Badge, Spinner, EmptyState } from '../components/ui';
+import { exportCsv } from '../lib/csv';
 
 export const Route = createFileRoute('/relatives')({
   component: RelativesPage,
@@ -90,13 +91,41 @@ function RelativesPage() {
     setModalOpen(true);
   };
 
+  const handleExport = () => {
+    exportCsv(
+      'relatives.csv',
+      filtered.map((r) => ({
+        name: r.name,
+        relation: r.relation ?? '',
+        child:
+          r.child_id != null
+            ? childName.get(r.child_id) ?? `Child #${r.child_id}`
+            : '',
+        phone: r.phone ?? '',
+        email: r.email ?? '',
+      })),
+      [
+        { key: 'name', label: 'Name' },
+        { key: 'relation', label: 'Relation' },
+        { key: 'child', label: 'Child' },
+        { key: 'phone', label: 'Phone' },
+        { key: 'email', label: 'Email' },
+      ],
+    );
+  };
+
   return (
     <div className="space-y-4 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-gray-900">Relatives</h1>
-        <button className="btn-primary" onClick={openAdd}>
-          Add relative
-        </button>
+        <div className="flex items-center gap-2">
+          <button className="btn-outline" onClick={handleExport} disabled={filtered.length === 0}>
+            Export CSV
+          </button>
+          <button className="btn-primary" onClick={openAdd}>
+            Add relative
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-3">

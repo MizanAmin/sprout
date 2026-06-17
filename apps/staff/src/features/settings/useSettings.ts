@@ -77,3 +77,30 @@ export function useUpdateSettings() {
     onSuccess: () => qc.invalidateQueries({ queryKey: settingsKeys.all }),
   });
 }
+
+// ── GoCardless connection settings ───────────────────────────
+// The API never returns the raw token: only whether one is set and a masked hint.
+export interface GoCardlessSettings {
+  connected: boolean;
+  hint: string;
+}
+
+export const gocardlessKeys = {
+  all: ['gocardless-settings'] as const,
+};
+
+export function useGoCardlessSettings() {
+  return useQuery({
+    queryKey: gocardlessKeys.all,
+    queryFn: () => api.get<GoCardlessSettings>('/payments/gocardless-settings'),
+  });
+}
+
+export function useUpdateGoCardlessSettings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (token: string) =>
+      api.put<GoCardlessSettings>('/payments/gocardless-settings', { token }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: gocardlessKeys.all }),
+  });
+}

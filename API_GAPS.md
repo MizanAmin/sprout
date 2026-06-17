@@ -1,5 +1,31 @@
 # Sprout — API Gaps Report
 
+## Status (updated)
+**✅ Implemented (migrations 018–019 applied to the live DB; API + frontend shipped):**
+- Plan in session JWT (`user_metadata.plan`) → nav hides plan-gated items below tier.
+- **A. Columns (all):** observations.next_steps, assessments.term, calendar_events.event_type,
+  send_flags.status, consent_forms.due_date, consent_templates.requires_signature+category,
+  accident_book.riddor_reportable+parent_notified_how, incidents.body_part+riddor_required,
+  funding_claims.claim_type/received_date/reference/notes/amount, staff_training.hours/type/notes,
+  staff_appraisals.period/overall_rating, rota.sat/sun, relatives.has_portal_access,
+  gdpr_settings.ico_registered/ico_number/privacy_notice.
+- **B. Endpoints:** monitoring historic `date`, waiting-list `/:id/move` + `/from-enquiry`,
+  GDPR `/audit`, billing `/status` (usage), finance `/revenue` by-type+invoiceCount,
+  finance `/run-reminders`, payments `/gocardless-settings`, staff-dev `/qualifications` + `/wellbeing`.
+- **C.** staff pickers + role gating; CSV **export** (children, relatives).
+
+**⏳ Deferred — need infrastructure, not quick slices:**
+- **File storage:** nursery logo upload, observation photo upload (need a storage signed-URL flow; `*_url` columns exist).
+- **PDF/print:** Ofsted SEF + report, invoice/revenue PDF/Excel export.
+- **CSV import** (children/relatives) — needs file upload + parse UI.
+- **Auto-invoicing config panel** + job-history/reminder-log + per-invoice payment ledger.
+- **Full structured rota model** (per-shift type/start/end/room/notes columns) — weekends done; the rest is a model overhaul.
+- **Consent bulk-send**, **settings invoice-config / preferences** toggles, compliance signoff/item aggregate counts, all-children assessment view.
+- **Parent-invite flow** (`POST /users` only invites staff/managers today).
+
+---
+
+
 Features the live app (app.sproutnursery.co.uk) has that the new Sprout backend
 doesn't yet expose. Surfaced from the `// TODO: needs …` markers left while
 replicating the 38 pages. Each staff page renders its layout and degrades

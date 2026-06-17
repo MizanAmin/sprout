@@ -21,6 +21,42 @@ async function nurseryGcToken(nurseryId: number): Promise<string> {
   return (rows[0]?.gocardless_access_token as string) || '';
 }
 
+// ---- GoCardless connection settings ----
+
+// Whether this nursery has its own GoCardless token set. Never returns the raw
+// token — only a connected flag and a masked hint (last 4 chars).
+app.get('/gocardless-settings', async (c) => {
+  const { nurseryId } = c.get('user');
+  const token = await nurseryGcToken(nurseryId);
+  const connected = token.length > 0;
+  return c.json({
+    connected,
+    hint: connected ? `••••${token.slice(-4)}` : '',
+  });
+});
+
+// Set (or clear) the nursery's GoCardless access token. An empty string clears
+// it, falling back to the platform token in getGoCardless.
+app.put(
+  '/gocardless-settings',
+  zValidator('json', z.object({ token: z.string() })),
+  async (c) => {
+    const { nurseryId } = c.get('user');
+    const { token } = c.req.valid('json');
+    await withTenant(nurseryId, (client) =>
+      client.query('UPDATE nurseries SET gocardless_access_token=$1 WHERE id=$2', [
+        token.trim(),
+        nurseryId,
+      ]),
+    );
+    const connected = token.trim().length > 0;
+    return c.json({
+      connected,
+      hint: connected ? `••••${token.trim().slice(-4)}` : '',
+    });
+  },
+);
+
 // ---- Manual payments ----
 
 const paymentCreateSchema = z.object({
