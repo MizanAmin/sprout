@@ -1,0 +1,16 @@
+# Railway config for the API service.
+# Lives at the repo root so the Docker build context is the whole pnpm workspace
+# (the API Dockerfile copies packages/* + apps/api). The staff static site and
+# the jobs worker are separate Railway services in the same project, configured
+# in the Railway dashboard (or their own config) — this file is the API service.
+[build]
+builder = "dockerfile"
+dockerfilePath = "apps/api/Dockerfile"
+
+[deploy]
+# Uses the Dockerfile CMD (`bun run src/index.ts`). Railway injects all the
+# environment variables from .env.example as service variables.
+healthcheckPath = "/health"
+healthcheckTimeout = 100
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 10

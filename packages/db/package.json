@@ -1,0 +1,27 @@
+{
+  "name": "@sprout/db",
+  "version": "0.0.0",
+  "private": true,
+  "exports": {
+    ".": "./src/client.ts",
+    "./native": "./src/client.native.ts",
+    "./admin": "./src/admin.ts",
+    "./pool": "./src/pool.ts",
+    "./types": "./src/types.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "pg": "^8.12.0"
+  },
+  "peerDependencies": {
+    "expo-secure-store": "*"
+  },
+  "peerDependenciesMeta": {
+    "expo-secure-store": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.0"
+  }
+}

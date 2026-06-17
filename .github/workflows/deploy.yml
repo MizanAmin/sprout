@@ -1,0 +1,25 @@
+name: Deploy
+
+# Runs after CI succeeds on main. Each job pings a Railway redeploy webhook;
+# Railway pulls the new commit and rebuilds the corresponding service.
+# Set RAILWAY_WEBHOOK_URL and RAILWAY_STAFF_WEBHOOK_URL as GitHub secrets.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  deploy-api:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Railway API redeploy
+        run: curl -fsSL -X POST "${{ secrets.RAILWAY_WEBHOOK_URL }}"
+
+  deploy-staff:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Railway staff (static site) redeploy
+        run: curl -fsSL -X POST "${{ secrets.RAILWAY_STAFF_WEBHOOK_URL }}"

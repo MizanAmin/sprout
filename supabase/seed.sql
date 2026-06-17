@@ -1,0 +1,3 @@
+-- Sprout dev seed data.
+-- Placeholder — populate with demo nurseries, users, children, etc.
+-- (Previous seed for the old UUID-based schema preserved in seed.sql.old.)

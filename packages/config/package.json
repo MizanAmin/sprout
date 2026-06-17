@@ -1,0 +1,13 @@
+{
+  "name": "@sprout/config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./tsconfig.base.json": "./tsconfig.base.json",
+    "./tsconfig.web.json": "./tsconfig.web.json",
+    "./tsconfig.native.json": "./tsconfig.native.json",
+    "./tsconfig.node.json": "./tsconfig.node.json",
+    "./tailwind.config": "./tailwind.config.ts"
+  }
+}

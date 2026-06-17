@@ -1,0 +1,8 @@
+{
+  "private": true,
+  "type": "module",
+  "comment": "Present only so Node's test runner treats the .ts files as ESM and strips types. The Supabase Edge runtime (Deno) ignores this file.",
+  "scripts": {
+    "test": "node --test"
+  }
+}

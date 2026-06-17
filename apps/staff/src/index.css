@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-bg text-gray-900 antialiased;
+  }
+}
+
+/* Utility classes referenced across forms/pages (see Form pattern in the spec). */
+@layer components {
+  .input {
+    @apply w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm
+           outline-none focus:border-primary focus:ring-2 focus:ring-primary/20;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2
+           text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50;
+  }
+}
