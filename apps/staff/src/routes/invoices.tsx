@@ -13,6 +13,7 @@ import {
 } from '../features/invoices/useInvoices';
 import { InvoiceModal } from '../features/invoices/InvoiceModal';
 import { StatCard, Badge, Spinner, EmptyState, gbp } from '../components/ui';
+import { printDocument, printHeader, escapeHtml } from '../lib/print';
 import type { InvoiceCreateInput } from '@sprout/schemas';
 
 export const Route = createFileRoute('/invoices')({ component: InvoicesPage });
@@ -29,6 +30,79 @@ const fmtDate = (d: string | null) =>
   d
     ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
     : '—';
+
+// Map invoice status to the print stylesheet's pill colour classes.
+const STATUS_PILL: Record<InvoiceStatus, 'green' | 'amber' | 'red' | 'grey'> = {
+  Paid: 'green',
+  Pending: 'amber',
+  Overdue: 'red',
+  Cancelled: 'grey',
+};
+
+// Build a branded, printable invoice document and open the browser print dialog.
+function printInvoice(inv: Invoice) {
+  const amount = Number(inv.amount);
+  const paid = Number(inv.amount_paid) || 0;
+  const balance = Math.max(0, amount - paid);
+  const items = inv.line_items ?? [];
+
+  const rows =
+    items.length > 0
+      ? items
+          .map((li) => {
+            const hasSession = li.hours != null && li.rate != null;
+            const detail = hasSession
+              ? `${escapeHtml(li.hours)} × ${gbp(Number(li.rate))}`
+              : '';
+            return `<tr>
+              <td>${escapeHtml(li.description)}</td>
+              <td class="right muted">${detail}</td>
+              <td class="right">${gbp(Number(li.amount))}</td>
+            </tr>`;
+          })
+          .join('')
+      : `<tr>
+          <td>${escapeHtml(inv.period ? `Childcare — ${inv.period}` : 'Childcare')}</td>
+          <td class="right muted"></td>
+          <td class="right">${gbp(amount)}</td>
+        </tr>`;
+
+  const body = `
+    ${printHeader('Invoice ' + escapeHtml(inv.invoice_ref))}
+    <table style="margin-bottom:20px">
+      <tr>
+        <td style="border:none;vertical-align:top;width:50%">
+          <div class="muted">Bill to</div>
+          <div style="font-weight:700;font-size:14px">${escapeHtml(inv.child_name)}</div>
+        </td>
+        <td style="border:none;vertical-align:top;text-align:right">
+          <div><span class="muted">Period:</span> ${escapeHtml(inv.period || '—')}</div>
+          <div><span class="muted">Issued:</span> ${escapeHtml(fmtDate(inv.created_at))}</div>
+          <div><span class="muted">Due:</span> ${escapeHtml(fmtDate(inv.due_date))}</div>
+          <div style="margin-top:6px">
+            <span class="pill ${STATUS_PILL[inv.status]}">${escapeHtml(inv.status)}</span>
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    <table>
+      <thead>
+        <tr><th>Description</th><th class="right">Detail</th><th class="right">Amount</th></tr>
+      </thead>
+      <tbody>${rows}</tbody>
+      <tfoot class="totals">
+        <tr><td></td><td class="right">Total</td><td class="right">${gbp(amount)}</td></tr>
+        <tr><td></td><td class="right">Paid</td><td class="right">${gbp(paid)}</td></tr>
+        <tr><td></td><td class="right">Balance due</td><td class="right">${gbp(balance)}</td></tr>
+      </tfoot>
+    </table>
+
+    ${inv.notes ? `<h2>Notes</h2><div class="muted">${escapeHtml(inv.notes)}</div>` : ''}
+  `;
+
+  printDocument('Invoice ' + inv.invoice_ref, body);
+}
 
 function InvoicesPage() {
   const [status, setStatus] = useState('');
@@ -174,6 +248,9 @@ function InvoicesPage() {
                       <div className="flex flex-wrap justify-end gap-3">
                         <button className="text-primary" onClick={() => openEdit(inv)}>
                           Edit
+                        </button>
+                        <button className="text-primary" onClick={() => printInvoice(inv)}>
+                          PDF
                         </button>
                         {inv.status !== 'Paid' && inv.status !== 'Cancelled' && (
                           <button

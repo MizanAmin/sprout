@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
 import { StatCard, Spinner, EmptyState, Badge, gbp } from '../components/ui';
 import { useRevenue, type RevenueReport } from '../features/finance/useFinance';
+import { printDocument, printHeader, escapeHtml } from '../lib/print';
 
 export const Route = createFileRoute('/revenue-report')({
   component: RevenueReportPage,
@@ -18,7 +19,7 @@ function RevenueReportPage() {
     <div className="space-y-4 p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold text-gray-900">Revenue Report</h1>
-        <div className="flex gap-1.5">
+        <div className="flex items-center gap-1.5">
           {PERIODS.map((p) => (
             <button
               key={p}
@@ -33,6 +34,14 @@ function RevenueReportPage() {
               {p}
             </button>
           ))}
+          <button
+            type="button"
+            onClick={() => revenue.data && exportRevenuePdf(revenue.data)}
+            disabled={!revenue.data}
+            className="btn-outline ml-1.5 px-3 py-1.5 text-sm"
+          >
+            Export PDF
+          </button>
         </div>
       </div>
 
@@ -283,6 +292,105 @@ function ByChildTable({ byChild }: { byChild: RevenueReport['byChild'] }) {
       )}
     </section>
   );
+}
+
+// Build a print-to-PDF document from the currently-loaded revenue report.
+function exportRevenuePdf(report: RevenueReport): void {
+  const { kpis, monthly, aging, byChild, byType, invoiceCount, period } = report;
+
+  const kpiCards = `
+    <div class="cards">
+      <div class="card"><div class="v">${escapeHtml(gbp(kpis.totalInvoiced))}</div><div class="l">Total invoiced</div></div>
+      <div class="card"><div class="v">${escapeHtml(gbp(kpis.collected))}</div><div class="l">Collected</div></div>
+      <div class="card"><div class="v">${kpis.collectionRate}%</div><div class="l">Collection rate</div></div>
+      <div class="card"><div class="v">${escapeHtml(gbp(kpis.outstanding))}</div><div class="l">Outstanding</div></div>
+    </div>`;
+
+  const monthlyRows =
+    monthly.length === 0
+      ? `<tr><td colspan="4" class="muted">No invoices for this period.</td></tr>`
+      : monthly
+          .map((m) => {
+            const outstanding = Math.max(m.invoiced - m.collected, 0);
+            return `<tr>
+              <td>${escapeHtml(formatMonth(m.month))}</td>
+              <td class="right">${escapeHtml(gbp(m.invoiced))}</td>
+              <td class="right">${escapeHtml(gbp(m.collected))}</td>
+              <td class="right">${escapeHtml(gbp(outstanding))}</td>
+            </tr>`;
+          })
+          .join('');
+  const monthlyTable = `
+    <h2>Monthly income</h2>
+    <table>
+      <thead><tr><th>Month</th><th class="right">Invoiced</th><th class="right">Collected</th><th class="right">Outstanding</th></tr></thead>
+      <tbody>${monthlyRows}</tbody>
+    </table>`;
+
+  const agingRows: { label: string; value: number }[] = [
+    { label: '0–30 days', value: aging.d0_30 },
+    { label: '31–60 days', value: aging.d31_60 },
+    { label: '61–90 days', value: aging.d61_90 },
+    { label: '90+ days', value: aging.d90_plus },
+  ];
+  const agingTotal = agingRows.reduce((sum, r) => sum + r.value, 0);
+  const agingTable = `
+    <h2>Debt aging</h2>
+    <table>
+      <thead><tr><th>Age</th><th class="right">Outstanding</th><th class="right">%</th></tr></thead>
+      <tbody>${agingRows
+        .map((r) => {
+          const pct = agingTotal > 0 ? Math.round((r.value / agingTotal) * 100) : 0;
+          return `<tr><td>${escapeHtml(r.label)}</td><td class="right">${escapeHtml(gbp(r.value))}</td><td class="right">${pct}%</td></tr>`;
+        })
+        .join('')}
+        <tr class="totals"><td>Total</td><td class="right">${escapeHtml(gbp(agingTotal))}</td><td class="right"></td></tr>
+      </tbody>
+    </table>`;
+
+  const byTypeTotal = byType.reduce((sum, r) => sum + r.total, 0);
+  const byTypeTable = `
+    <h2>Invoiced by status</h2>
+    <table>
+      <thead><tr><th>Status</th><th class="right">Invoices</th><th class="right">Total</th><th class="right">%</th></tr></thead>
+      <tbody>${
+        byType.length === 0
+          ? `<tr><td colspan="4" class="muted">No invoices for this nursery.</td></tr>`
+          : byType
+              .map((r) => {
+                const pct = byTypeTotal > 0 ? Math.round((r.total / byTypeTotal) * 100) : 0;
+                return `<tr><td>${escapeHtml(r.type)}</td><td class="right">${r.count}</td><td class="right">${escapeHtml(gbp(r.total))}</td><td class="right">${pct}%</td></tr>`;
+              })
+              .join('')
+      }</tbody>
+    </table>`;
+
+  const byChildTable = `
+    <h2>Outstanding by child</h2>
+    <table>
+      <thead><tr><th>Child</th><th class="right">Outstanding</th></tr></thead>
+      <tbody>${
+        byChild.length === 0
+          ? `<tr><td colspan="2" class="muted">No outstanding balances by child.</td></tr>`
+          : byChild
+              .map(
+                (c) =>
+                  `<tr><td>${escapeHtml(c.child_name)}</td><td class="right">${escapeHtml(gbp(c.outstanding))}</td></tr>`,
+              )
+              .join('')
+      }</tbody>
+    </table>`;
+
+  const body =
+    printHeader('Revenue Report', period) +
+    `<p class="muted">${invoiceCount} invoice${invoiceCount === 1 ? '' : 's'} · ${escapeHtml(gbp(kpis.avgPerChild))} avg per child</p>` +
+    kpiCards +
+    monthlyTable +
+    agingTable +
+    byTypeTable +
+    byChildTable;
+
+  printDocument('Revenue Report', body);
 }
 
 // month is 'YYYY-MM' from the API.

@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { Badge, Spinner, EmptyState } from '../components/ui';
 import { useOfsted, type OfstedStatus, type OfstedSection } from '../features/ofsted/useOfsted';
+import { printDocument, printHeader, escapeHtml } from '../lib/print';
 
 export const Route = createFileRoute('/ofsted')({
   component: OfstedPage,
@@ -33,6 +34,40 @@ const QUICK_LINKS = [
   { to: '/staff', label: 'Staff', hint: 'DBS, qualifications & ratios' },
   { to: '/accident-book', label: 'Accident Book', hint: 'Incidents & RIDDOR records' },
 ] as const;
+
+// Build & print a browser-printable Ofsted readiness report (save-as-PDF).
+function printReadinessReport(sections: OfstedSection[]): void {
+  const counts = sections.reduce(
+    (acc, s) => {
+      acc[s.status] += 1;
+      return acc;
+    },
+    { green: 0, amber: 0, red: 0 } as Record<OfstedStatus, number>,
+  );
+
+  const summary = `<p class="muted">${escapeHtml(
+    `${sections.length} areas reviewed — ${counts.green} good, ${counts.amber} needs review, ${counts.red} action required.`,
+  )}</p>`;
+
+  const rows = sections
+    .map(
+      (s) =>
+        `<tr>` +
+        `<td>${escapeHtml(s.label)}</td>` +
+        `<td><span class="pill ${s.status}">${escapeHtml(STATUS_LABEL[s.status])}</span></td>` +
+        `<td>${escapeHtml(s.detail)}</td>` +
+        `</tr>`,
+    )
+    .join('');
+
+  const table = `<table>
+    <thead><tr><th>Area</th><th>Status</th><th>Detail</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+
+  const body = printHeader('Ofsted Inspection Readiness') + summary + table;
+  printDocument('Ofsted Inspection Readiness', body);
+}
 
 function ReadinessCard({ section }: { section: OfstedSection }) {
   const accent = STATUS_ACCENT[section.status];
@@ -74,15 +109,25 @@ function OfstedPage() {
 
   return (
     <div className="space-y-4 p-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold text-gray-900">Ofsted Mode</h1>
-        {!isLoading && total > 0 && (
-          <div className="flex gap-2">
-            {counts.red > 0 && <Badge variant="danger">{counts.red} action required</Badge>}
-            {counts.amber > 0 && <Badge variant="warning">{counts.amber} needs review</Badge>}
-            {counts.green > 0 && <Badge variant="success">{counts.green} good</Badge>}
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {!isLoading && total > 0 && (
+            <div className="flex gap-2">
+              {counts.red > 0 && <Badge variant="danger">{counts.red} action required</Badge>}
+              {counts.amber > 0 && <Badge variant="warning">{counts.amber} needs review</Badge>}
+              {counts.green > 0 && <Badge variant="success">{counts.green} good</Badge>}
+            </div>
+          )}
+          <button
+            type="button"
+            className="btn-outline"
+            disabled={isLoading || total === 0}
+            onClick={() => printReadinessReport(sections)}
+          >
+            Print report
+          </button>
+        </div>
       </div>
 
       <p className="text-sm text-muted">
@@ -159,8 +204,7 @@ function OfstedPage() {
                 </Link>
               ))}
             </div>
-            {/* TODO: needs GET /ofsted/report + GET /ofsted/sef to add the reference's
-                EYFS coverage table, staff-ratio breakdown, and draft SEF export. */}
+            {/* TODO: needs GET /ofsted/sef to add the reference's draft SEF export. */}
           </div>
         </>
       )}

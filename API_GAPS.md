@@ -16,7 +16,7 @@
 
 **⏳ Deferred — need infrastructure, not quick slices:**
 - **File storage** — ✅ done: `POST /uploads` (signed) + `GET /uploads/url` (tenant-scoped signed URLs) on the private bucket; wired to nursery **logo** (Settings) and **observation photos** (Journal) via useUpload/SignedImage.
-- **PDF/print:** Ofsted SEF + report, invoice/revenue PDF/Excel export.
+- **PDF/print** — ✅ done (browser print-to-PDF): invoice PDF, revenue report export, Ofsted readiness report. Remaining: a formatted Ofsted **SEF** document + native Excel export (CSV export already covers data).
 - **CSV import** — ✅ done: client-side parse (`parseCsv`) + bulk-create via existing endpoints on Children and Relatives, with imported/skipped summary.
 - **Auto-invoicing config panel** + job-history/reminder-log + per-invoice payment ledger.
 - **Full structured rota model** (per-shift type/start/end/room/notes columns) — weekends done; the rest is a model overhaul.
