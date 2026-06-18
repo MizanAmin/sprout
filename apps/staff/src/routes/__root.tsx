@@ -9,47 +9,76 @@ export const Route = createRootRoute({ component: RootShell });
 
 type Session = Awaited<ReturnType<typeof supabase.auth.getSession>>['data']['session'];
 
-// Full navigation. `mgr` items are hidden from non-manager staff (the API also
-// enforces this server-side). Order mirrors the live app's grouping.
-const NAV: { to: string; label: string; mgr?: boolean; plan?: Plan }[] = [
-  { to: '/dashboard', label: 'Dashboard' },
-  { to: '/children', label: 'Children' },
-  { to: '/relatives', label: 'Relatives' },
-  { to: '/staff', label: 'Staff' },
-  { to: '/staff-dev', label: 'Staff Development', mgr: true, plan: 'blossom' },
-  { to: '/enquiries', label: 'Enquiries', mgr: true },
-  { to: '/waiting-list', label: 'Waiting List', mgr: true },
-  { to: '/consents', label: 'Consent Forms', mgr: true },
-  { to: '/messages', label: 'Messages' },
-  { to: '/newsfeed', label: 'Newsfeed' },
-  { to: '/rooms', label: 'Rooms' },
-  { to: '/rota', label: 'Staff Rota' },
-  { to: '/sessions', label: 'Sessions & Funding' },
-  { to: '/planning', label: 'Planning' },
-  { to: '/monitoring', label: 'Monitoring' },
-  { to: '/register', label: 'Live Register' },
-  { to: '/fire-register', label: 'Fire Register' },
-  { to: '/calendar', label: 'Calendar' },
-  { to: '/assessment', label: 'Assessment' },
-  { to: '/daily-logs', label: 'Daily Logs' },
-  { to: '/journal', label: 'Learning Journal' },
-  { to: '/reflections', label: 'Reflections' },
-  { to: '/send', label: 'SEND' },
-  { to: '/medications', label: 'Medications' },
-  { to: '/incidents', label: 'Incidents' },
-  { to: '/accident-book', label: 'Accident Book' },
-  { to: '/ofsted', label: 'Ofsted Mode', mgr: true },
-  { to: '/compliance', label: 'Compliance Hub', mgr: true, plan: 'blossom' },
-  { to: '/gdpr', label: 'GDPR', mgr: true },
-  { to: '/invoices', label: 'Invoices', mgr: true },
-  { to: '/finance', label: 'Finance', mgr: true },
-  { to: '/revenue-report', label: 'Revenue Report', mgr: true },
-  { to: '/funded-hours', label: 'Funded Hours', mgr: true },
-  { to: '/funding', label: 'Funding', mgr: true },
-  { to: '/reports', label: 'Reports', mgr: true },
-  { to: '/users', label: 'Staff Accounts', mgr: true },
-  { to: '/settings', label: 'Settings', mgr: true },
-  { to: '/billing', label: 'Billing', mgr: true },
+// Navigation grouped into sections. `mgr` items are hidden from non-manager
+// staff (the API also enforces this server-side); `plan` items are hidden below
+// the required tier. Dashboard sits above the groups as a standalone item.
+type NavItem = { to: string; label: string; mgr?: boolean; plan?: Plan };
+
+const DASHBOARD: NavItem = { to: '/dashboard', label: 'Dashboard' };
+
+const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
+  {
+    title: 'People',
+    items: [
+      { to: '/children', label: 'Children' },
+      { to: '/relatives', label: 'Relatives' },
+      { to: '/staff', label: 'Staff' },
+      { to: '/staff-dev', label: 'Staff Development', mgr: true, plan: 'blossom' },
+      { to: '/enquiries', label: 'Enquiries', mgr: true },
+      { to: '/waiting-list', label: 'Waiting List', mgr: true },
+    ],
+  },
+  {
+    title: 'Operations',
+    items: [
+      { to: '/register', label: 'Live Register' },
+      { to: '/rooms', label: 'Rooms' },
+      { to: '/rota', label: 'Staff Rota' },
+      { to: '/sessions', label: 'Sessions & Funding' },
+      { to: '/daily-logs', label: 'Daily Logs' },
+      { to: '/monitoring', label: 'Monitoring' },
+      { to: '/calendar', label: 'Calendar' },
+      { to: '/messages', label: 'Messages' },
+      { to: '/newsfeed', label: 'Newsfeed' },
+      { to: '/consents', label: 'Consent Forms', mgr: true },
+    ],
+  },
+  {
+    title: 'Pedagogy',
+    items: [
+      { to: '/planning', label: 'Planning' },
+      { to: '/assessment', label: 'Assessment' },
+      { to: '/journal', label: 'Learning Journal' },
+      { to: '/reflections', label: 'Reflections' },
+      { to: '/send', label: 'SEND' },
+    ],
+  },
+  {
+    title: 'Compliance',
+    items: [
+      { to: '/medications', label: 'Medications' },
+      { to: '/incidents', label: 'Incidents' },
+      { to: '/accident-book', label: 'Accident Book' },
+      { to: '/fire-register', label: 'Fire Register' },
+      { to: '/ofsted', label: 'Ofsted Mode', mgr: true },
+      { to: '/compliance', label: 'Compliance Hub', mgr: true, plan: 'blossom' },
+      { to: '/gdpr', label: 'GDPR', mgr: true },
+    ],
+  },
+  {
+    title: 'Management',
+    items: [
+      { to: '/invoices', label: 'Invoices', mgr: true },
+      { to: '/finance', label: 'Finance', mgr: true },
+      { to: '/funding', label: 'Funding', mgr: true },
+      { to: '/funded-hours', label: 'Funded Hours', mgr: true },
+      { to: '/revenue-report', label: 'Revenue Report', mgr: true },
+      { to: '/reports', label: 'Reports', mgr: true },
+      { to: '/users', label: 'Staff Accounts', mgr: true },
+      { to: '/settings', label: 'Settings', mgr: true },
+      { to: '/billing', label: 'Billing', mgr: true },
+    ],
+  },
 ];
 
 function RootShell() {
@@ -91,13 +120,19 @@ function RootShell() {
   }
 
   // Hide manager-only items from staff, and plan-gated items below the tier.
-  const nav = NAV.filter((n) => {
+  const canSee = (n: NavItem) => {
     if (n.mgr && user && user.role !== 'manager') return false;
     if (n.plan && user && !planAtLeast(user.plan, n.plan)) return false;
     return true;
-  });
+  };
+  const visibleGroups = NAV_GROUPS.map((g) => ({
+    title: g.title,
+    items: g.items.filter(canSee),
+  })).filter((g) => g.items.length > 0);
+  // Flat list (Dashboard + all visible items) for the ⌘K palette and topbar title.
+  const flatNav = [DASHBOARD, ...NAV_GROUPS.flatMap((g) => g.items)].filter(canSee);
   // Topbar title = the deepest matching nav label.
-  const current = [...nav]
+  const current = [...flatNav]
     .filter((n) => pathname === n.to || pathname.startsWith(n.to + '/'))
     .sort((a, b) => b.to.length - a.to.length)[0];
 
@@ -105,15 +140,28 @@ function RootShell() {
     <div className="flex h-screen overflow-hidden bg-bg">
       <aside className="flex w-60 shrink-0 flex-col bg-sidebar text-white">
         <div className="flex items-center gap-2 px-5 py-5 text-lg font-semibold">🌱 Sprout</div>
-        <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 pb-4">
-          {nav.map((item) => (
-            <Link
-              key={item.to}
-              to={item.to}
-              className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-white/55 transition hover:bg-sidebar-hover hover:text-white/90 [&.active]:bg-sidebar-active [&.active]:font-semibold [&.active]:text-indigo-300"
-            >
-              {item.label}
-            </Link>
+        <nav className="flex-1 overflow-y-auto px-2 pb-4">
+          <Link
+            to={DASHBOARD.to}
+            className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-white/55 transition hover:bg-sidebar-hover hover:text-white/90 [&.active]:bg-sidebar-active [&.active]:font-semibold [&.active]:text-indigo-300"
+          >
+            {DASHBOARD.label}
+          </Link>
+          {visibleGroups.map((group) => (
+            <div key={group.title} className="mt-4 space-y-0.5">
+              <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-white/35">
+                {group.title}
+              </div>
+              {group.items.map((item) => (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-white/55 transition hover:bg-sidebar-hover hover:text-white/90 [&.active]:bg-sidebar-active [&.active]:font-semibold [&.active]:text-indigo-300"
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </div>
           ))}
         </nav>
       </aside>
@@ -155,7 +203,7 @@ function RootShell() {
         </main>
       </div>
 
-      <QuickJump items={nav.map((n) => ({ to: n.to, label: n.label }))} />
+      <QuickJump items={flatNav.map((n) => ({ to: n.to, label: n.label }))} />
     </div>
   );
 }
