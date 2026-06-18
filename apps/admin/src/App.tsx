@@ -20,9 +20,20 @@ function toDateInput(s: string | null): string {
   return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
 }
 
+// Pull an OAuth/magic-link error out of the URL (hash or query) on return, then
+// strip it so it doesn't stick around on refresh.
+function readUrlError(): string {
+  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+  const query = new URLSearchParams(window.location.search);
+  const msg = hash.get('error_description') || query.get('error_description') || '';
+  if (msg) window.history.replaceState({}, '', window.location.pathname);
+  return msg.replace(/\+/g, ' ');
+}
+
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [ready, setReady] = useState(false);
+  const [urlError] = useState(readUrlError);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -34,87 +45,64 @@ export default function App() {
   }, []);
 
   if (!ready) return <div className="gate muted">Loading…</div>;
-  if (!session) return <LoginGate />;
+  if (!session) return <LoginGate urlError={urlError} />;
   return <Dashboard email={session.user.email ?? ''} />;
 }
 
-// --- Login (Supabase OTP email code) ------------------------------------------
-function LoginGate() {
-  const [step, setStep] = useState<'email' | 'code'>('email');
+// --- Login (Supabase magic link) ----------------------------------------------
+function LoginGate({ urlError }: { urlError?: string }) {
   const [email, setEmail] = useState('');
-  const [code, setCode] = useState('');
-  const [err, setErr] = useState('');
+  const [err, setErr] = useState(urlError ?? '');
   const [busy, setBusy] = useState(false);
+  const [sent, setSent] = useState(false);
 
-  async function sendCode(e: React.FormEvent) {
+  async function send(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setErr('');
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim(),
-      options: { shouldCreateUser: true },
+      options: { shouldCreateUser: true, emailRedirectTo: window.location.origin },
     });
     setBusy(false);
     if (error) setErr(error.message);
-    else setStep('code');
+    else setSent(true);
   }
 
-  async function verify(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setErr('');
-    const { error } = await supabase.auth.verifyOtp({
-      email: email.trim(),
-      token: code.trim(),
-      type: 'email',
-    });
-    setBusy(false);
-    if (error) setErr(error.message);
-    // success → onAuthStateChange sets the session and re-renders.
+  if (sent) {
+    return (
+      <div className="gate">
+        <div className="gate-card">
+          <div className="brand">🌱 Sprout — Platform Admin</div>
+          <p className="muted">
+            Magic link sent to <strong>{email}</strong>. Open the email on this device and click the
+            link to sign in.
+          </p>
+          <button className="btn-ghost" onClick={() => setSent(false)}>
+            Use a different email
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="gate">
-      <form className="gate-card" onSubmit={step === 'email' ? sendCode : verify}>
+      <form className="gate-card" onSubmit={send}>
         <div className="brand">🌱 Sprout — Platform Admin</div>
-        {step === 'email' ? (
-          <>
-            <p className="muted">Sign in with your admin email. We'll send a one-time code.</p>
-            <input
-              type="email"
-              className="input"
-              placeholder="you@example.com"
-              value={email}
-              autoFocus
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            {err && <div className="error">{err}</div>}
-            <button className="btn-primary" disabled={busy || !email.trim()}>
-              {busy ? 'Sending…' : 'Send code'}
-            </button>
-          </>
-        ) : (
-          <>
-            <p className="muted">
-              Enter the 6-digit code sent to <strong>{email}</strong>.
-            </p>
-            <input
-              className="input"
-              placeholder="123456"
-              value={code}
-              autoFocus
-              inputMode="numeric"
-              onChange={(e) => setCode(e.target.value)}
-            />
-            {err && <div className="error">{err}</div>}
-            <button className="btn-primary" disabled={busy || !code.trim()}>
-              {busy ? 'Verifying…' : 'Verify & sign in'}
-            </button>
-            <button type="button" className="btn-ghost" onClick={() => setStep('email')}>
-              Use a different email
-            </button>
-          </>
-        )}
+        <p className="muted">Enter your admin email — we'll send you a magic sign-in link.</p>
+        <input
+          type="email"
+          className="input"
+          placeholder="you@example.com"
+          value={email}
+          autoFocus
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        {err && <div className="error">{err}</div>}
+        <button className="btn-primary" disabled={busy || !email.trim()}>
+          {busy ? 'Sending…' : 'Send magic link'}
+        </button>
       </form>
     </div>
   );
