@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from '@tanstack/react-router';
 import { supabase } from '@sprout/db';
 import { router } from './router';
+import { clearMfaToken } from './api';
 import './index.css';
 
 const queryClient = new QueryClient({
@@ -12,9 +13,13 @@ const queryClient = new QueryClient({
       retry: (failureCount, error: any) => {
         // Never retry auth or billing errors — they won't resolve on retry.
         if (
-          ['UNAUTHORIZED', 'FORBIDDEN', 'TRIAL_EXPIRED', 'PLAN_UPGRADE_REQUIRED'].includes(
-            error?.code,
-          )
+          [
+            'UNAUTHORIZED',
+            'FORBIDDEN',
+            'TRIAL_EXPIRED',
+            'PLAN_UPGRADE_REQUIRED',
+            'MFA_REQUIRED',
+          ].includes(error?.code)
         )
           return false;
         return failureCount < 2;
@@ -25,6 +30,10 @@ const queryClient = new QueryClient({
         if (error?.code === 'UNAUTHORIZED') {
           supabase.auth.signOut();
           router.navigate({ to: '/login' });
+        } else if (error?.code === 'MFA_REQUIRED') {
+          // Second factor not satisfied for this session — go verify.
+          clearMfaToken();
+          router.navigate({ to: '/mfa' });
         } else if (error?.code === 'TRIAL_EXPIRED') {
           // Trial expiry blocks the whole app, so push to billing.
           router.navigate({ to: '/billing' });
@@ -44,6 +53,9 @@ queryClient.getQueryCache().subscribe((event) => {
   if (error?.code === 'UNAUTHORIZED') {
     supabase.auth.signOut();
     router.navigate({ to: '/login' });
+  } else if (error?.code === 'MFA_REQUIRED') {
+    clearMfaToken();
+    router.navigate({ to: '/mfa' });
   } else if (error?.code === 'TRIAL_EXPIRED') {
     router.navigate({ to: '/billing' });
   }

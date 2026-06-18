@@ -6,6 +6,7 @@ import { logger } from 'hono/logger';
 
 import { requireAuth } from './middleware/auth';
 import { requireActiveSubscription } from './middleware/trial';
+import { requireMfa } from './middleware/requireMfa';
 import type { HonoEnv } from './types';
 import auth from './routes/auth';
 import parent from './routes/parent';
@@ -105,6 +106,7 @@ app.use(
     ],
     requireAuth,
     requireActiveSubscription,
+    requireMfa,
   ),
 );
 

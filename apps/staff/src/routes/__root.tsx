@@ -118,6 +118,8 @@ function RootShell() {
   }, []);
 
   const isLogin = pathname === '/login';
+  // The second-factor step renders bare (no nav shell) but requires a session.
+  const isMfa = pathname === '/mfa';
 
   useEffect(() => {
     if (!ready) return;
@@ -130,6 +132,7 @@ function RootShell() {
   }
   if (isLogin) return <Outlet />;
   if (!session) return null;
+  if (isMfa) return <Outlet />;
 
   async function signOut() {
     await supabase.auth.signOut();

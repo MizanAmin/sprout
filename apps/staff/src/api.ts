@@ -2,6 +2,21 @@ import { supabase } from '@sprout/db';
 
 const BASE = import.meta.env.VITE_API_URL;
 
+// Email second-factor proof, stored per-browser. Sent as X-MFA-Token so the API
+// can enforce the second factor on every request (see requireMfa on the server).
+const MFA_KEY = 'sprout.mfaToken';
+export const getMfaToken = () => localStorage.getItem(MFA_KEY) ?? '';
+export const setMfaToken = (t: string) => localStorage.setItem(MFA_KEY, t);
+export const clearMfaToken = () => localStorage.removeItem(MFA_KEY);
+
+function authHeaders(accessToken?: string): Record<string, string> {
+  const mfa = getMfaToken();
+  return {
+    ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+    ...(mfa ? { 'X-MFA-Token': mfa } : {}),
+  };
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const {
     data: { session },
@@ -10,7 +25,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     method,
     headers: {
       'Content-Type': 'application/json',
-      ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+      ...authHeaders(session?.access_token),
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
@@ -29,7 +44,7 @@ async function upload<T>(path: string, formData: FormData): Promise<T> {
   } = await supabase.auth.getSession();
   const res = await fetch(`${BASE}${path}`, {
     method: 'POST',
-    headers: { ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}) },
+    headers: authHeaders(session?.access_token),
     body: formData,
   });
   if (!res.ok) {

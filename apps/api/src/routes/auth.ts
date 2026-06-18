@@ -1,8 +1,14 @@
 import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
+import { SignJWT } from 'jose';
+import { randomInt, createHash } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { supabaseAdmin, pool } from '../db';
+import { requireAuth } from '../middleware/auth';
+import { mfaSecret } from '../middleware/requireMfa';
+import { sendEmail } from '../services/email';
+import type { HonoEnv } from '../types';
 
 // Public auth flows. No requireAuth — these are the entry points before a session
 // exists. register-nursery spans three systems (nurseries row, Supabase Auth user,
@@ -21,7 +27,7 @@ function getAnon() {
   return _anon;
 }
 
-const app = new Hono();
+const app = new Hono<HonoEnv>();
 
 // --- POST /register-nursery ---------------------------------------------------
 const registerSchema = z.object({
@@ -128,6 +134,74 @@ app.post('/verify-otp', zValidator('json', verifyOtpSchema), async (c) => {
     return c.json({ error: 'Invalid or expired code', code: 'UNAUTHORIZED' }, 401);
   }
   return c.json({ session: data.session });
+});
+
+// === Email second factor (staff/manager) =====================================
+// These two routes live under /api/auth, which is exempt from the global
+// requireAuth + subscription + MFA gate, so they apply requireAuth inline and are
+// reachable BEFORE the second factor is satisfied (avoiding a chicken-and-egg).
+const MFA_CODE_TTL_MIN = 10;
+const MFA_MAX_ATTEMPTS = 5;
+const hashCode = (code: string) => createHash('sha256').update(code).digest('hex');
+
+// --- POST /mfa/send — email a fresh 6-digit code ------------------------------
+app.post('/mfa/send', requireAuth, async (c) => {
+  const user = c.get('user');
+  const { rows } = await pool.query<{ email: string }>('SELECT email FROM users WHERE id=$1', [
+    user.id,
+  ]);
+  const email = rows[0]?.email;
+  if (!email) return c.json({ error: 'No email on file', code: 'VALIDATION_ERROR' }, 400);
+
+  const code = String(randomInt(0, 1_000_000)).padStart(6, '0');
+  await pool.query(
+    `INSERT INTO mfa_codes (user_id, code_hash, expires_at, attempts)
+     VALUES ($1, $2, NOW() + make_interval(mins => $3), 0)
+     ON CONFLICT (user_id) DO UPDATE
+       SET code_hash = EXCLUDED.code_hash, expires_at = EXCLUDED.expires_at,
+           attempts = 0, created_at = NOW()`,
+    [user.id, hashCode(code), MFA_CODE_TTL_MIN],
+  );
+  await sendEmail({
+    to: email,
+    subject: 'Your Sprout sign-in code',
+    html: `<p>Your Sprout verification code is <strong style="font-size:20px;letter-spacing:2px">${code}</strong>.</p>
+           <p>It expires in ${MFA_CODE_TTL_MIN} minutes. If you didn't try to sign in, you can ignore this email.</p>`,
+  });
+  return c.json({ ok: true });
+});
+
+// --- POST /mfa/verify — check the code, mint a 12h proof token -----------------
+const verifyMfaSchema = z.object({ code: z.string().min(4).max(8) });
+
+app.post('/mfa/verify', requireAuth, zValidator('json', verifyMfaSchema), async (c) => {
+  const user = c.get('user');
+  const { code } = c.req.valid('json');
+  const { rows } = await pool.query<{ code_hash: string; expires_at: string; attempts: number }>(
+    'SELECT code_hash, expires_at, attempts FROM mfa_codes WHERE user_id=$1',
+    [user.id],
+  );
+  const row = rows[0];
+  if (!row) return c.json({ error: 'No code requested', code: 'MFA_INVALID' }, 400);
+  if (new Date(row.expires_at) < new Date()) {
+    await pool.query('DELETE FROM mfa_codes WHERE user_id=$1', [user.id]);
+    return c.json({ error: 'Code expired — request a new one', code: 'MFA_INVALID' }, 400);
+  }
+  if (row.attempts >= MFA_MAX_ATTEMPTS) {
+    return c.json({ error: 'Too many attempts — request a new code', code: 'MFA_INVALID' }, 429);
+  }
+  if (row.code_hash !== hashCode(code)) {
+    await pool.query('UPDATE mfa_codes SET attempts = attempts + 1 WHERE user_id=$1', [user.id]);
+    return c.json({ error: 'Incorrect code', code: 'MFA_INVALID' }, 400);
+  }
+
+  await pool.query('DELETE FROM mfa_codes WHERE user_id=$1', [user.id]);
+  const mfaToken = await new SignJWT({ purpose: 'mfa' })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setSubject(user.id)
+    .setExpirationTime('12h')
+    .sign(mfaSecret());
+  return c.json({ mfaToken });
 });
 
 export default app;

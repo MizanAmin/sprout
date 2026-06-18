@@ -27,6 +27,7 @@ import { Route as PlanningRouteImport } from './routes/planning'
 import { Route as OfstedRouteImport } from './routes/ofsted'
 import { Route as NewsfeedRouteImport } from './routes/newsfeed'
 import { Route as MonitoringRouteImport } from './routes/monitoring'
+import { Route as MfaRouteImport } from './routes/mfa'
 import { Route as MessagesRouteImport } from './routes/messages'
 import { Route as MedicationsRouteImport } from './routes/medications'
 import { Route as LoginRouteImport } from './routes/login'
@@ -143,6 +144,11 @@ const NewsfeedRoute = NewsfeedRouteImport.update({
 const MonitoringRoute = MonitoringRouteImport.update({
   id: '/monitoring',
   path: '/monitoring',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MfaRoute = MfaRouteImport.update({
+  id: '/mfa',
+  path: '/mfa',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MessagesRoute = MessagesRouteImport.update({
@@ -304,6 +310,7 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/medications': typeof MedicationsRoute
   '/messages': typeof MessagesRoute
+  '/mfa': typeof MfaRoute
   '/monitoring': typeof MonitoringRoute
   '/newsfeed': typeof NewsfeedRoute
   '/ofsted': typeof OfstedRoute
@@ -351,6 +358,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/medications': typeof MedicationsRoute
   '/messages': typeof MessagesRoute
+  '/mfa': typeof MfaRoute
   '/monitoring': typeof MonitoringRoute
   '/newsfeed': typeof NewsfeedRoute
   '/ofsted': typeof OfstedRoute
@@ -399,6 +407,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/medications': typeof MedicationsRoute
   '/messages': typeof MessagesRoute
+  '/mfa': typeof MfaRoute
   '/monitoring': typeof MonitoringRoute
   '/newsfeed': typeof NewsfeedRoute
   '/ofsted': typeof OfstedRoute
@@ -448,6 +457,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/medications'
     | '/messages'
+    | '/mfa'
     | '/monitoring'
     | '/newsfeed'
     | '/ofsted'
@@ -495,6 +505,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/medications'
     | '/messages'
+    | '/mfa'
     | '/monitoring'
     | '/newsfeed'
     | '/ofsted'
@@ -542,6 +553,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/medications'
     | '/messages'
+    | '/mfa'
     | '/monitoring'
     | '/newsfeed'
     | '/ofsted'
@@ -590,6 +602,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   MedicationsRoute: typeof MedicationsRoute
   MessagesRoute: typeof MessagesRoute
+  MfaRoute: typeof MfaRoute
   MonitoringRoute: typeof MonitoringRoute
   NewsfeedRoute: typeof NewsfeedRoute
   OfstedRoute: typeof OfstedRoute
@@ -742,6 +755,13 @@ declare module '@tanstack/react-router' {
       path: '/monitoring'
       fullPath: '/monitoring'
       preLoaderRoute: typeof MonitoringRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mfa': {
+      id: '/mfa'
+      path: '/mfa'
+      fullPath: '/mfa'
+      preLoaderRoute: typeof MfaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/messages': {
@@ -958,6 +978,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   MedicationsRoute: MedicationsRoute,
   MessagesRoute: MessagesRoute,
+  MfaRoute: MfaRoute,
   MonitoringRoute: MonitoringRoute,
   NewsfeedRoute: NewsfeedRoute,
   OfstedRoute: OfstedRoute,
