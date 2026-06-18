@@ -9,12 +9,23 @@ import type { HonoEnv } from '../types';
 export const requireActiveSubscription = createMiddleware<HonoEnv>(async (c, next) => {
   const { nurseryId } = c.get('user');
   const { rows } = await pool.query(
-    'SELECT plan, trial_ends_at, stripe_subscription_id FROM nurseries WHERE id=$1',
+    'SELECT plan, status, trial_ends_at, stripe_subscription_id FROM nurseries WHERE id=$1',
     [nurseryId],
   );
   const n = rows[0];
   // Defensive: a valid token whose nursery row is gone (deleted) → 401, not a 500.
   if (!n) return c.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, 401);
+  // Platform admin can suspend a nursery (nurseries.status); block all access.
+  if (n.status === 'suspended') {
+    return c.json(
+      {
+        error: 'account_suspended',
+        code: 'ACCOUNT_SUSPENDED',
+        message: 'This account has been suspended. Please contact support.',
+      },
+      403,
+    );
+  }
   const trialActive = n.trial_ends_at && new Date(n.trial_ends_at) > new Date();
   const subscribed = !!n.stripe_subscription_id;
   if (!trialActive && !subscribed && n.plan !== 'cancelled') {

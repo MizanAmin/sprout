@@ -53,12 +53,25 @@ import billing from './routes/billing';
 import billingWebhook from './routes/billing-webhook';
 import fundedHours from './routes/funded-hours';
 import funding from './routes/funding';
+import admin from './routes/admin';
 
 const app = new Hono<HonoEnv>();
 
-// CORS: staff web app only. React Native does not send Origin headers,
-// so the parent mobile app does not need to be listed here.
-app.use('*', cors({ origin: [process.env.STAFF_APP_URL ?? 'http://localhost:5173'] }));
+// CORS: staff web app + platform admin app. React Native does not send Origin
+// headers, so the parent mobile app does not need to be listed here. X-Admin-Key
+// is allowed for the admin app's shared-secret auth.
+app.use(
+  '*',
+  cors({
+    origin: [
+      process.env.STAFF_APP_URL ?? 'http://localhost:5173',
+      process.env.ADMIN_APP_URL ?? 'https://sprout-admin.pages.dev',
+      'http://localhost:5174',
+    ],
+    allowHeaders: ['Content-Type', 'Authorization', 'X-Admin-Key'],
+    allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  }),
+);
 app.use('*', logger());
 app.use(
   '/api/*',
@@ -81,8 +94,15 @@ app.use(
   '/api/*',
   except(
     // Skip the gate for: auth (pre-session), billing (upgrade path), parent
-    // (end-users), and the public GoCardless webhook (no JWT).
-    ['/api/auth/*', '/api/billing/*', '/api/parent/*', '/api/payments/gocardless-webhook'],
+    // (end-users), the public GoCardless webhook (no JWT), and admin (guarded by
+    // its own X-Admin-Key shared secret, not the per-nursery JWT).
+    [
+      '/api/auth/*',
+      '/api/billing/*',
+      '/api/parent/*',
+      '/api/payments/gocardless-webhook',
+      '/api/admin/*',
+    ],
     requireAuth,
     requireActiveSubscription,
   ),
@@ -143,5 +163,6 @@ app.route('/api/reflections', reflections);
 app.route('/api/child-sessions', childSessions);
 app.route('/api/fire-register', fireRegister);
 app.route('/api/uploads', uploads);
+app.route('/api/admin', admin);
 
 export default { port: process.env.PORT || 3000, fetch: app.fetch };

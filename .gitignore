@@ -35,6 +35,8 @@ android/app/build/
 # Staff web app ships PUBLIC client config (publishable key + URLs) so its prod
 # build is zero-config on any static host. Safe to commit; tracked deliberately.
 !apps/staff/.env.production
+# Admin app ships only the API URL (no secrets — the admin key is runtime-only).
+!apps/admin/.env.production
 
 # Supabase
 supabase/.branches/
