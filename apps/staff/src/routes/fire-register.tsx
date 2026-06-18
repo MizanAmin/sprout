@@ -9,6 +9,7 @@ import {
   type FireDrillInput,
 } from '../features/fire-register/useFireRegister';
 import { Modal, Spinner, EmptyState, Badge, Field, StatCard } from '../components/ui';
+import { fmtDate } from '../lib/date';
 
 export const Route = createFileRoute('/fire-register')({ component: FireRegisterPage });
 
@@ -32,13 +33,6 @@ function formatSeconds(total: number): string {
   const mins = Math.floor(total / 60);
   const secs = Math.round(total % 60);
   return `${mins}:${String(secs).padStart(2, '0')}`;
-}
-
-// Format an ISO date (yyyy-mm-dd) into a short readable label.
-function formatDate(date: string): string {
-  const d = new Date(date);
-  if (Number.isNaN(d.getTime())) return date;
-  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 function FireRegisterPage() {
@@ -75,7 +69,7 @@ function FireRegisterPage() {
 
     return {
       total,
-      lastDate: lastDate ? formatDate(lastDate) : '—',
+      lastDate: lastDate ? fmtDate(lastDate) : '—',
       avgEvac,
       thisYear,
     };
@@ -129,7 +123,7 @@ function FireRegisterPage() {
               {all.map((d) => (
                 <tr key={d.id} className="border-b border-border last:border-0">
                   <td className="px-4 py-3 text-gray-900">
-                    <div className="font-medium">{formatDate(d.date)}</div>
+                    <div className="font-medium">{fmtDate(d.date)}</div>
                     {d.time && <div className="text-xs text-muted">{d.time}</div>}
                   </td>
                   <td className="px-4 py-3 capitalize">{d.drill_type}</td>
@@ -149,7 +143,7 @@ function FireRegisterPage() {
                       <button
                         className="text-sm text-danger"
                         onClick={() => {
-                          if (confirm(`Delete the drill on ${formatDate(d.date)}?`)) deleteDrill.mutate(d.id);
+                          if (confirm(`Delete the drill on ${fmtDate(d.date)}?`)) deleteDrill.mutate(d.id);
                         }}
                       >
                         Delete

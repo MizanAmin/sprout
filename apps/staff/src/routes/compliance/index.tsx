@@ -15,6 +15,7 @@ import {
 } from '../../features/compliance/useCompliance';
 import { Modal, Field, Spinner, EmptyState, Badge, StatCard } from '../../components/ui';
 import { UpgradeNotice, isPlanError } from '../../components/UpgradeNotice';
+import { fmtDate } from '../../lib/date';
 
 export const Route = createFileRoute('/compliance/')({
   component: CompliancePage,
@@ -50,11 +51,6 @@ const REVIEW_LABEL: Record<ReviewStatus, string> = {
   ok: 'On track',
   none: 'No date',
 };
-
-function fmtDate(d: string | null): string {
-  if (!d) return 'Not set';
-  return new Date(d).toLocaleDateString('en-GB');
-}
 
 function countOverdue(rows: { next_review: string | null }[]): number {
   return rows.filter((r) => reviewStatus(r.next_review) === 'overdue').length;

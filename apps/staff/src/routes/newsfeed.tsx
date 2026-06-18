@@ -9,6 +9,7 @@ import {
   type NewsfeedPostInput,
 } from '../features/newsfeed/useNewsfeed';
 import { Modal, Field, Spinner, EmptyState } from '../components/ui';
+import { fmtDate } from '../lib/date';
 
 export const Route = createFileRoute('/newsfeed')({
   component: NewsfeedPage,
@@ -37,15 +38,6 @@ function metaFor(type: string): TypeMeta {
   const key = type?.toLowerCase().trim();
   if (key in TYPE_META) return TYPE_META[key];
   return { ...DEFAULT_META, label: type || DEFAULT_META.label };
-}
-
-// Format an ISO date (snake_case `date` column) for display, e.g. "17 Jun 2026".
-function fmtDate(iso: string): string {
-  if (!iso) return '';
-  const [y, m, d] = iso.slice(0, 10).split('-');
-  if (!y || !m || !d) return iso;
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return `${parseInt(d, 10)} ${months[parseInt(m, 10) - 1]} ${y}`;
 }
 
 function NewsfeedPage() {

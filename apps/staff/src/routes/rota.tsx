@@ -16,6 +16,7 @@ import {
 } from '../features/rota/useRota';
 import { useStaff, type Staff } from '../features/staff/useStaff';
 import { Modal, Field, Spinner, EmptyState, Badge } from '../components/ui';
+import { fmtDate } from '../lib/date';
 
 export const Route = createFileRoute('/rota')({
   component: RotaPage,
@@ -40,10 +41,6 @@ const TYPE_VARIANTS: Record<ShiftType, 'success' | 'info' | 'danger' | 'warning'
   training: 'warning',
   off: 'muted',
 };
-
-// UK long date, e.g. "9 Jun 2025".
-const fmtDateUK = (iso: string) =>
-  new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
 // Column header parts for a week date — weekday short name + day-of-month.
 const fmtWeekday = (iso: string) =>
@@ -117,7 +114,7 @@ function RotaPage() {
             ◀ Prev
           </button>
           <span className="min-w-[12rem] text-center text-sm font-semibold text-gray-900">
-            Week of {fmtDateUK(weekStart)}
+            Week of {fmtDate(weekStart)}
           </span>
           <button
             className="btn-outline btn-sm"
@@ -345,7 +342,7 @@ function ShiftModal({
       }
     >
       <form id="shift-form" onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <p className="text-xs text-muted">{fmtDateUK(date)}</p>
+        <p className="text-xs text-muted">{fmtDate(date)}</p>
 
         <Field label="Type" error={errors.type?.message}>
           <select className="input" {...register('type')}>

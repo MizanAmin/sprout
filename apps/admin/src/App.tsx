@@ -6,12 +6,16 @@ import { api, type ApiError, type Nursery, type NurseryUser, type Plan } from '.
 
 const PLANS: Plan[] = ['seedling', 'blossom', 'grove', 'forest', 'cancelled'];
 
+// UK numeric date: DD-MM-YYYY (date-only strings reordered to avoid TZ shifts).
 function fmtDate(s: string | null): string {
   if (!s) return '—';
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`;
   const d = new Date(s);
-  return Number.isNaN(d.getTime())
-    ? '—'
-    : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  if (Number.isNaN(d.getTime())) return '—';
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  return `${dd}-${mm}-${d.getFullYear()}`;
 }
 
 function toDateInput(s: string | null): string {

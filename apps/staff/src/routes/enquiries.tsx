@@ -13,6 +13,7 @@ import {
 import { EnquiryForm } from '../features/enquiries/EnquiryForm';
 import { useAddFromEnquiry } from '../features/waiting-list/useWaitingList';
 import { Modal, Badge, Spinner, EmptyState, StatCard } from '../components/ui';
+import { fmtDate } from '../lib/date';
 
 export const Route = createFileRoute('/enquiries')({
   component: EnquiriesPage,
@@ -50,13 +51,6 @@ const STATUS_VARIANT: Record<EnquiryStatus, 'info' | 'warning' | 'success' | 'mu
 
 const CLOSED: EnquiryStatus[] = ['Enrolled', 'Declined'];
 
-// dd/mm/yyyy, matching fmtDateUK in the reference app.
-function fmtDateUK(d?: string | null): string {
-  if (!d) return '';
-  const dt = new Date(d);
-  if (Number.isNaN(dt.getTime())) return '';
-  return dt.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
-}
 
 function EnquiriesPage() {
   const [view, setView] = useState<'board' | 'table'>('board');
@@ -216,7 +210,7 @@ function PipelineCard({
         <span className="badge badge-info mt-1 text-[9px]">{e.room}</span>
       )}
       {e.start_date && (
-        <div className="mt-1 text-[10px] text-muted">Start {fmtDateUK(e.start_date)}</div>
+        <div className="mt-1 text-[10px] text-muted">Start {fmtDate(e.start_date)}</div>
       )}
       <div className="mt-2 flex flex-wrap gap-1">
         {next && !isClosed && (
@@ -331,7 +325,7 @@ function EnquiryTable({
                 <tr key={e.id} className="hover:bg-gray-50">
                   <td className="px-4 py-2">
                     <div className="font-medium text-gray-900">{e.child_name}</div>
-                    {e.dob && <div className="text-xs text-muted">{fmtDateUK(e.dob)}</div>}
+                    {e.dob && <div className="text-xs text-muted">{fmtDate(e.dob)}</div>}
                   </td>
                   <td className="px-4 py-2">{e.parent_name || '—'}</td>
                   <td className="px-4 py-2">
@@ -346,7 +340,7 @@ function EnquiryTable({
                     </div>
                   </td>
                   <td className="px-4 py-2">{e.room || '—'}</td>
-                  <td className="px-4 py-2">{fmtDateUK(e.start_date) || '—'}</td>
+                  <td className="px-4 py-2">{fmtDate(e.start_date)}</td>
                   <td className="px-4 py-2">
                     <Badge variant={PRIORITY_VARIANT[e.priority]}>{e.priority}</Badge>
                   </td>

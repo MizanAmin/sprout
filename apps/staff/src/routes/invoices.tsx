@@ -17,6 +17,7 @@ import {
 import { InvoiceModal } from '../features/invoices/InvoiceModal';
 import { StatCard, Badge, Spinner, EmptyState, Modal, gbp } from '../components/ui';
 import { printDocument, printHeader, escapeHtml } from '../lib/print';
+import { fmtDate } from '../lib/date';
 import type { InvoiceCreateInput } from '@sprout/schemas';
 
 export const Route = createFileRoute('/invoices')({ component: InvoicesPage });
@@ -27,12 +28,6 @@ const STATUS_VARIANT: Record<InvoiceStatus, 'success' | 'warning' | 'danger' | '
   Overdue: 'danger',
   Cancelled: 'muted',
 };
-
-// en-GB date for due/issue columns; tolerates null and ISO/date strings.
-const fmtDate = (d: string | null) =>
-  d
-    ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
-    : '—';
 
 // Map invoice status to the print stylesheet's pill colour classes.
 const STATUS_PILL: Record<InvoiceStatus, 'green' | 'amber' | 'red' | 'grey'> = {

@@ -13,6 +13,7 @@ import { ChildForm } from '../../features/children/ChildForm';
 import { Modal, Badge, Spinner, EmptyState } from '../../components/ui';
 import { exportCsv, parseCsv } from '../../lib/csv';
 import { exportXlsx } from '../../lib/xlsx';
+import { fmtDate } from '../../lib/date';
 
 export const Route = createFileRoute('/children/')({ component: ChildrenPage });
 
@@ -43,15 +44,6 @@ function initials(name: string): string {
     .join('')
     .toUpperCase()
     .slice(0, 2);
-}
-
-// Format a 'YYYY-MM-DD' dob for display (e.g. "1 Mar 2022").
-function fmtDob(dob: string | null): string {
-  if (!dob) return '—';
-  const d = new Date(dob);
-  return Number.isNaN(d.getTime())
-    ? dob
-    : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 function hasAllergy(allergy: string): boolean {
@@ -313,7 +305,7 @@ function ChildrenPage() {
                           {c.name}
                         </Link>
                         <div className="text-xs text-muted">
-                          {fmtDob(c.dob)}
+                          {fmtDate(c.dob)}
                           {c.gender ? ` · ${c.gender}` : ''}
                         </div>
                       </div>

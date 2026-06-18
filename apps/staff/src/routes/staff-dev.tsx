@@ -29,6 +29,7 @@ import {
 import { useStaff } from '../features/staff/useStaff';
 import { Modal, Field, Spinner, EmptyState, Badge, StatCard } from '../components/ui';
 import { UpgradeNotice, isPlanError } from '../components/UpgradeNotice';
+import { fmtDate } from '../lib/date';
 
 export const Route = createFileRoute('/staff-dev')({
   component: StaffDevPage,
@@ -83,13 +84,6 @@ const RATING_VARIANT: Record<string, 'success' | 'warning' | 'danger' | 'info' |
 
 function ratingVariant(rating: string): 'success' | 'warning' | 'danger' | 'info' | 'muted' {
   return RATING_VARIANT[rating.trim().toLowerCase()] ?? 'info';
-}
-
-function fmtDate(d: string | null): string {
-  if (!d) return '—';
-  const parsed = new Date(d);
-  if (Number.isNaN(parsed.getTime())) return d;
-  return parsed.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
 function StaffDevPage() {

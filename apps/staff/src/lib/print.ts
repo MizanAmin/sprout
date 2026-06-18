@@ -1,6 +1,8 @@
 // Browser print-to-PDF. Renders an HTML document in a hidden iframe and calls
 // print() — the user picks "Save as PDF" (or a printer). No server-side PDF lib.
 
+import { fmtDate } from './date';
+
 export function escapeHtml(value: unknown): string {
   const s = value === null || value === undefined ? '' : String(value);
   return s
@@ -39,7 +41,7 @@ const PRINT_CSS = `
 
 // Standard document header (brand + title on the left, subtitle + date on the right).
 export function printHeader(title: string, subtitle?: string): string {
-  const date = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  const date = fmtDate(new Date());
   return `<div class="doc-head">
     <div><div class="brand">🌱 Sprout</div><h1>${escapeHtml(title)}</h1></div>
     <div class="muted" style="text-align:right">${subtitle ? escapeHtml(subtitle) + '<br>' : ''}Generated ${date}</div>

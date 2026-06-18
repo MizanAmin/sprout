@@ -21,6 +21,7 @@ import {
 } from '../features/consents/useConsents';
 import { useChildren } from '../features/children/useChildren';
 import { Field, Modal, Badge, Spinner, EmptyState, StatCard } from '../components/ui';
+import { fmtDate } from '../lib/date';
 
 export const Route = createFileRoute('/consents')({
   component: ConsentsPage,
@@ -31,9 +32,6 @@ const FORM_STATUS_VARIANT: Record<ConsentFormStatus, 'warning' | 'success' | 'da
   signed: 'success',
   declined: 'danger',
 };
-
-const ukDate = (s: string | null) =>
-  s ? new Date(s).toLocaleDateString('en-GB') : '—';
 
 // A form is overdue when it is still awaiting signature (pending) and its
 // due_date is strictly before today.
@@ -282,13 +280,13 @@ function SentFormsTable({ forms }: { forms: ConsentForm[] }) {
               </td>
               <td className="px-4 py-2 text-muted">
                 <span className="flex items-center gap-1.5">
-                  {ukDate(f.due_date)}
+                  {fmtDate(f.due_date)}
                   {isOverdue(f) && <Badge variant="danger">Overdue</Badge>}
                 </span>
               </td>
               <td className="px-4 py-2">{f.signed_by || '—'}</td>
               <td className="px-4 py-2 text-muted">{ukDateTime(f.signed_at)}</td>
-              <td className="px-4 py-2 text-muted">{ukDate(f.created_at)}</td>
+              <td className="px-4 py-2 text-muted">{fmtDate(f.created_at)}</td>
               <td className="px-4 py-2 text-right">
                 {f.status !== 'signed' && (
                   <button

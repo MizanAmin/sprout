@@ -17,6 +17,7 @@ import {
   type AssessmentWithChild,
 } from '../features/assessments/useAssessments';
 import { Field, Modal, Badge, Spinner, EmptyState } from '../components/ui';
+import { fmtDate } from '../lib/date';
 
 export const Route = createFileRoute('/assessment')({ component: AssessmentPage });
 
@@ -46,14 +47,6 @@ function scoreColor(score: number): string {
   if (score >= 4) return 'var(--success, #16a34a)';
   if (score >= 3) return 'var(--warning, #d97706)';
   return 'var(--danger, #dc2626)';
-}
-
-function fmtDate(d: string | null): string {
-  if (!d) return '—';
-  const dt = new Date(d);
-  return Number.isNaN(dt.getTime())
-    ? d
-    : dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 type ViewMode = 'by-child' | 'all';

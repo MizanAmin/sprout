@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../src/api';
 import { useStore } from '../../src/store';
+import { fmtDate } from '../../src/date';
 
 interface ReportCard {
   attendance: { status: string } | null;
@@ -119,7 +120,7 @@ export default function Home() {
             {!!latestEvent.description && (
               <Text className="mt-1 text-sm text-muted">{latestEvent.description}</Text>
             )}
-            <Text className="mt-1 text-xs text-muted">{latestEvent.date}</Text>
+            <Text className="mt-1 text-xs text-muted">{fmtDate(latestEvent.date)}</Text>
           </View>
         ) : (
           <Text className="mt-2 text-sm text-muted">No recent announcements.</Text>

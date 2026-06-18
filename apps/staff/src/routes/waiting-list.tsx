@@ -13,6 +13,7 @@ import {
 import { WaitingListForm } from '../features/waiting-list/WaitingListForm';
 import { ageFromDob } from '../features/children/useChildren';
 import { Modal, Badge, Spinner, EmptyState, StatCard } from '../components/ui';
+import { fmtDate } from '../lib/date';
 
 export const Route = createFileRoute('/waiting-list')({
   component: WaitingListPage,
@@ -32,13 +33,6 @@ const STATUS_LABEL: Record<WaitingStatus, string> = {
   withdrawn: 'Withdrawn',
 };
 
-// Format an ISO date (YYYY-MM-DD) as UK short date — mirrors fmtDateUK in the reference.
-function fmtDateUK(date: string | null): string {
-  if (!date) return '—';
-  const d = new Date(date);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-}
 
 function WaitingListPage() {
   const [status, setStatus] = useState('');
@@ -192,7 +186,7 @@ function WaitingListPage() {
                   <td className="px-4 py-2">
                     <div className="font-semibold text-gray-900">{e.child_name}</div>
                     <div className="text-xs text-muted">
-                      {e.dob ? `${fmtDateUK(e.dob)} · ${ageFromDob(e.dob)}` : '—'}
+                      {e.dob ? `${fmtDate(e.dob)} · ${ageFromDob(e.dob)}` : '—'}
                     </div>
                   </td>
                   <td className="px-4 py-2">
@@ -204,7 +198,7 @@ function WaitingListPage() {
                     {e.room ? <Badge variant="info">{e.room}</Badge> : <span className="text-muted">—</span>}
                   </td>
                   <td className="px-4 py-2 text-muted">{e.days_required || '—'}</td>
-                  <td className="px-4 py-2 text-muted">{fmtDateUK(e.desired_start)}</td>
+                  <td className="px-4 py-2 text-muted">{fmtDate(e.desired_start)}</td>
                   <td className="px-4 py-2">
                     <Badge variant={STATUS_VARIANT[e.status]}>{STATUS_LABEL[e.status]}</Badge>
                   </td>

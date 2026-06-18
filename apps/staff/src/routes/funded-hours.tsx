@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
 import { StatCard, Spinner, EmptyState, Badge } from '../components/ui';
+import { fmtDate } from '../lib/date';
 import { useFundedHours } from '../features/funded-hours/useFundedHours';
 
 export const Route = createFileRoute('/funded-hours')({
@@ -29,14 +30,6 @@ function fmtHrs(h: number): string {
   return `${(Number(h) || 0).toFixed(1)} hrs`;
 }
 
-function fmtWeekLabel(iso: string): string {
-  return new Date(iso + 'T00:00:00').toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-}
-
 function FundedHoursPage() {
   const currentMonday = useMemo(() => weekMondayISO(), []);
   const [weekStart, setWeekStart] = useState(currentMonday);
@@ -63,7 +56,7 @@ function FundedHoursPage() {
             ◀
           </button>
           <div className="rounded-lg border border-border bg-surface px-3.5 py-1.5 text-sm font-semibold text-primary">
-            W/C {fmtWeekLabel(weekStart)}
+            W/C {fmtDate(weekStart)}
           </div>
           <button
             className="btn-outline btn-sm"

@@ -11,6 +11,7 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../src/api';
 import { useStore } from '../../src/store';
+import { fmtDate } from '../../src/date';
 
 interface Observation {
   id: number;
@@ -64,7 +65,7 @@ export default function Journal() {
               )}
               <Text className="text-sm text-gray-900">{item.text}</Text>
               <Text className="mt-2 text-xs text-muted">
-                {item.obs_date}
+                {fmtDate(item.obs_date)}
                 {item.practitioner ? ` · ${item.practitioner}` : ''}
               </Text>
             </View>

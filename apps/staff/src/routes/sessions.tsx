@@ -10,6 +10,7 @@ import {
 } from '../features/sessions/useSessions';
 import { useChildren, type Child } from '../features/children/useChildren';
 import { Modal, Field, Spinner, EmptyState, Badge, StatCard } from '../components/ui';
+import { fmtDate } from '../lib/date';
 
 export const Route = createFileRoute('/sessions')({
   component: SessionsPage,
@@ -45,11 +46,6 @@ function shiftWeek(weekStart: string, deltaDays: number): string {
 // Friday (week end) of the given week-start.
 function fridayOf(weekStart: string): string {
   return shiftWeek(weekStart, 4);
-}
-
-function fmtDateUK(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
 // A weekly session pattern is "active" in a given week if its [start_date, end_date]
@@ -158,7 +154,7 @@ function SessionsPage() {
                 ← Prev
               </button>
               <span className="text-sm font-semibold text-gray-900">
-                Week of {fmtDateUK(weekStart)}
+                Week of {fmtDate(weekStart)}
               </span>
               <button
                 className="btn-outline btn-sm"

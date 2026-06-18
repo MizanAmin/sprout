@@ -3,6 +3,7 @@ import { ScrollView, View, Text, Pressable, ActivityIndicator } from 'react-nati
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../src/api';
 import { useStore } from '../../src/store';
+import { fmtDate } from '../../src/date';
 
 interface Log {
   id: number;
@@ -52,7 +53,7 @@ export default function Daily() {
         <Pressable onPress={() => setDate((d) => shiftDay(d, -1))}>
           <Text className="text-lg text-primary">‹</Text>
         </Pressable>
-        <Text className="font-semibold text-gray-900">{date}</Text>
+        <Text className="font-semibold text-gray-900">{fmtDate(date)}</Text>
         <Pressable onPress={() => setDate((d) => shiftDay(d, 1))} disabled={date >= iso(new Date())}>
           <Text className={`text-lg ${date >= iso(new Date()) ? 'text-gray-300' : 'text-primary'}`}>›</Text>
         </Pressable>
