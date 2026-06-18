@@ -35,6 +35,7 @@ const NAV_GROUPS: { title: string; items: NavItem[] }[] = [
       { to: '/rooms', label: 'Rooms' },
       { to: '/rota', label: 'Staff Rota' },
       { to: '/sessions', label: 'Sessions & Funding' },
+      { to: '/booking-requests', label: 'Booking Requests' },
       { to: '/daily-logs', label: 'Daily Logs' },
       { to: '/monitoring', label: 'Monitoring' },
       { to: '/calendar', label: 'Calendar' },
