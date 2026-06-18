@@ -5,33 +5,62 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "splash": { "image": "./assets/splash.png", "resizeMode": "contain", "backgroundColor": "#ffffff" },
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "ios": {
       "bundleIdentifier": "uk.co.sproutnursery.parent",
       "supportsTablet": false,
       "infoPlist": {
         "NSCameraUsageDescription": "Used to add photos to observations",
-        "NSPhotoLibraryUsageDescription": "Used to attach photos from your library"
+        "NSPhotoLibraryUsageDescription": "Used to attach photos from your library",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "uk.co.sproutnursery.parent",
-      "adaptiveIcon": { "foregroundImage": "./assets/adaptive-icon.png", "backgroundColor": "#ffffff" },
-      "permissions": ["CAMERA", "READ_EXTERNAL_STORAGE"]
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      ["expo-notifications", {
-        "icon": "./assets/icon.png",
-        "color": "#4f8ef7",
-        "sounds": ["./assets/notification.wav"]
-      }],
-      ["expo-camera", { "cameraPermission": "Used to add photos to observations" }]
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#4f8ef7",
+          "sounds": [
+            "./assets/notification.wav"
+          ]
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Used to add photos to observations"
+        }
+      ]
     ],
+    "scheme": "sprout",
     "extra": {
-      "eas": { "projectId": "YOUR_EAS_PROJECT_ID" }
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "54ced8fc-2e33-4abd-a487-5fe3549a1d51"
+      }
     },
-    "scheme": "sprout"
+    "owner": "sproutnursery"
   }
 }
