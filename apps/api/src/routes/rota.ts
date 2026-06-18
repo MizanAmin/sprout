@@ -6,83 +6,69 @@ import { requireRole } from '../middleware/requireRole';
 import { withTenant } from '../db';
 import type { HonoEnv } from '../types';
 
-// Staff rota (the `rota` table, migration 005). One row per
-// (nursery, staff_name, week_start).
+// Staff rota — structured shifts (rota_shifts, migration 020). One row per shift
+// (staff × date) with type, times, room and notes.
 const app = new Hono<HonoEnv>();
 app.use('*', requireAuth, requireRole('manager', 'staff'));
 
 const createSchema = z.object({
+  staffId: z.number().int().positive(),
   staffName: z.string().min(1),
-  weekStart: z.string().min(1),
-  mon: z.string().optional(),
-  tue: z.string().optional(),
-  wed: z.string().optional(),
-  thu: z.string().optional(),
-  fri: z.string().optional(),
-  sat: z.string().optional(),
-  sun: z.string().optional(),
+  date: z.string().min(1),
+  type: z.enum(['work', 'holiday', 'sick', 'training', 'off']).optional(),
+  startTime: z.string().optional(),
+  endTime: z.string().optional(),
+  room: z.string().optional(),
+  notes: z.string().optional(),
 });
 
 const updateSchema = createSchema.partial();
 
 const COLS: Record<string, string> = {
+  staffId: 'staff_id',
   staffName: 'staff_name',
-  weekStart: 'week_start',
-  mon: 'mon',
-  tue: 'tue',
-  wed: 'wed',
-  thu: 'thu',
-  fri: 'fri',
-  sat: 'sat',
-  sun: 'sun',
+  date: 'date',
+  type: 'type',
+  startTime: 'start_time',
+  endTime: 'end_time',
+  room: 'room',
+  notes: 'notes',
 };
 
+// GET /?weekStart=YYYY-MM-DD — shifts in that Mon–Sun week (or all if omitted).
 app.get('/', async (c) => {
   const { nurseryId } = c.get('user');
   const weekStart = c.req.query('weekStart');
   const params: unknown[] = [nurseryId];
-  let sql = 'SELECT * FROM rota WHERE nursery_id=$1';
+  let sql = 'SELECT * FROM rota_shifts WHERE nursery_id=$1';
   if (weekStart) {
     params.push(weekStart);
-    sql += ` AND week_start=$${params.length}`;
+    sql += ` AND date >= $${params.length}::date AND date < ($${params.length}::date + 7)`;
   }
-  sql += ' ORDER BY week_start DESC, staff_name';
+  sql += ' ORDER BY date, staff_name, start_time NULLS LAST, id';
   const { rows } = await withTenant(nurseryId, (client) => client.query(sql, params));
   return c.json(rows);
 });
 
-app.get('/:id', async (c) => {
-  const { nurseryId } = c.get('user');
-  const id = c.req.param('id');
-  const { rows } = await withTenant(nurseryId, (client) =>
-    client.query('SELECT * FROM rota WHERE id=$1 AND nursery_id=$2', [id, nurseryId]),
-  );
-  if (!rows[0]) return c.json({ error: 'Rota entry not found', code: 'NOT_FOUND' }, 404);
-  return c.json(rows[0]);
-});
-
-// Upsert on (nursery_id, staff_name, week_start).
 app.post('/', zValidator('json', createSchema), async (c) => {
   const { nurseryId } = c.get('user');
   const b = c.req.valid('json');
   const { rows } = await withTenant(nurseryId, (client) =>
     client.query(
-      `INSERT INTO rota (nursery_id, staff_name, week_start, mon, tue, wed, thu, fri, sat, sun)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-       ON CONFLICT (nursery_id, staff_name, week_start)
-       DO UPDATE SET mon=EXCLUDED.mon, tue=EXCLUDED.tue, wed=EXCLUDED.wed, thu=EXCLUDED.thu, fri=EXCLUDED.fri, sat=EXCLUDED.sat, sun=EXCLUDED.sun
+      `INSERT INTO rota_shifts
+         (nursery_id, staff_id, staff_name, date, type, start_time, end_time, room, notes)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        RETURNING *`,
       [
         nurseryId,
+        b.staffId,
         b.staffName,
-        b.weekStart,
-        b.mon ?? '',
-        b.tue ?? '',
-        b.wed ?? '',
-        b.thu ?? '',
-        b.fri ?? '',
-        b.sat ?? '',
-        b.sun ?? '',
+        b.date,
+        b.type ?? 'work',
+        b.startTime ?? null,
+        b.endTime ?? null,
+        b.room ?? '',
+        b.notes ?? '',
       ],
     ),
   );
@@ -109,11 +95,11 @@ app.patch('/:id', zValidator('json', updateSchema), async (c) => {
   vals.push(id, nurseryId);
   const { rows } = await withTenant(nurseryId, (client) =>
     client.query(
-      `UPDATE rota SET ${sets.join(', ')} WHERE id=$${i++} AND nursery_id=$${i} RETURNING *`,
+      `UPDATE rota_shifts SET ${sets.join(', ')} WHERE id=$${i++} AND nursery_id=$${i} RETURNING *`,
       vals,
     ),
   );
-  if (!rows[0]) return c.json({ error: 'Rota entry not found', code: 'NOT_FOUND' }, 404);
+  if (!rows[0]) return c.json({ error: 'Shift not found', code: 'NOT_FOUND' }, 404);
   return c.json(rows[0]);
 });
 
@@ -121,9 +107,9 @@ app.delete('/:id', async (c) => {
   const { nurseryId } = c.get('user');
   const id = c.req.param('id');
   const { rows } = await withTenant(nurseryId, (client) =>
-    client.query('DELETE FROM rota WHERE id=$1 AND nursery_id=$2 RETURNING id', [id, nurseryId]),
+    client.query('DELETE FROM rota_shifts WHERE id=$1 AND nursery_id=$2 RETURNING id', [id, nurseryId]),
   );
-  if (!rows[0]) return c.json({ error: 'Rota entry not found', code: 'NOT_FOUND' }, 404);
+  if (!rows[0]) return c.json({ error: 'Shift not found', code: 'NOT_FOUND' }, 404);
   return c.json({ ok: true });
 });
 

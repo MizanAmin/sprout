@@ -19,7 +19,7 @@
 - **PDF/print** — ✅ done (browser print-to-PDF): invoice PDF, revenue report export, Ofsted readiness report. Remaining: a formatted Ofsted **SEF** document + native Excel export (CSV export already covers data).
 - **CSV import** — ✅ done: client-side parse (`parseCsv`) + bulk-create via existing endpoints on Children and Relatives, with imported/skipped summary.
 - **Auto-invoicing config panel** + job-history/reminder-log + per-invoice payment ledger.
-- **Full structured rota model** (per-shift type/start/end/room/notes columns) — weekends done; the rest is a model overhaul.
+- **Structured rota model** — ✅ done: migration 020 `rota_shifts` (one row per shift, type/start/end/room/notes), rewritten `/api/rota` CRUD + weekly grid UI (staff × Mon–Sun, type-coloured chips, click-to-add/edit).
 - **Consent bulk-send**, **settings invoice-config / preferences** toggles, compliance signoff/item aggregate counts, all-children assessment view.
 - **Parent invite** — ✅ done: `POST /users/parent` creates a parent login (role parent + child_ids) linked to children, with a Staff Accounts "Invite parent" modal.
 
