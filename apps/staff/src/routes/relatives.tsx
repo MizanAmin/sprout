@@ -12,6 +12,7 @@ import { RelativeForm } from '../features/relatives/RelativeForm';
 import { useChildren, type Child } from '../features/children/useChildren';
 import { Modal, Badge, Spinner, EmptyState } from '../components/ui';
 import { exportCsv, parseCsv } from '../lib/csv';
+import { exportXlsx } from '../lib/xlsx';
 
 export const Route = createFileRoute('/relatives')({
   component: RelativesPage,
@@ -116,6 +117,24 @@ function RelativesPage() {
     );
   };
 
+  const handleExportExcel = async () => {
+    await exportXlsx('relatives.xlsx', [
+      {
+        name: 'Relatives',
+        rows: filtered.map((r) => ({
+          Name: r.name,
+          Relation: r.relation ?? '',
+          Child:
+            r.child_id != null
+              ? childName.get(r.child_id) ?? `Child #${r.child_id}`
+              : '',
+          Phone: r.phone ?? '',
+          Email: r.email ?? '',
+        })),
+      },
+    ]);
+  };
+
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -186,6 +205,13 @@ function RelativesPage() {
         <div className="flex items-center gap-2">
           <button className="btn-outline" onClick={handleExport} disabled={filtered.length === 0}>
             Export CSV
+          </button>
+          <button
+            className="btn-outline"
+            onClick={handleExportExcel}
+            disabled={filtered.length === 0}
+          >
+            Export Excel
           </button>
           <button className="btn-outline" onClick={() => fileInputRef.current?.click()}>
             Import CSV

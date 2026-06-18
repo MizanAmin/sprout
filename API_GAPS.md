@@ -14,8 +14,8 @@
   finance `/run-reminders`, payments `/gocardless-settings`, staff-dev `/qualifications` + `/wellbeing`.
 - **C.** staff pickers + role gating; CSV **export** (children, relatives).
 
-**Remaining (non-essential):**
-- Native **Excel** (.xlsx) export — CSV export already covers data round-trips; true .xlsx needs a spreadsheet lib.
+**Remaining: none — full parity reached.**
+- Native **Excel (.xlsx) export** — ✅ done: SheetJS (lazy-loaded), multi-sheet, on Children, Relatives, and Revenue Report.
 
 Everything else from this report is implemented (migrations 018–021 live; API + frontend deployed): payment ledger + Direct-Debit charge, consent bulk-send, compliance aggregate counts, all-children assessment view, Ofsted readiness report + draft SEF, settings invoice customisation, auto-invoice/reminder/GoCardless config, file storage (logo + photos), CSV import, structured rota, parent invites, plan-in-JWT nav gating.
 ---

@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { StatCard, Spinner, EmptyState, Badge, gbp } from '../components/ui';
 import { useRevenue, type RevenueReport } from '../features/finance/useFinance';
 import { printDocument, printHeader, escapeHtml } from '../lib/print';
+import { exportXlsx } from '../lib/xlsx';
 
 export const Route = createFileRoute('/revenue-report')({
   component: RevenueReportPage,
@@ -41,6 +42,14 @@ function RevenueReportPage() {
             className="btn-outline ml-1.5 px-3 py-1.5 text-sm"
           >
             Export PDF
+          </button>
+          <button
+            type="button"
+            onClick={() => revenue.data && exportRevenueExcel(revenue.data)}
+            disabled={!revenue.data}
+            className="btn-outline px-3 py-1.5 text-sm"
+          >
+            Export Excel
           </button>
         </div>
       </div>
@@ -292,6 +301,45 @@ function ByChildTable({ byChild }: { byChild: RevenueReport['byChild'] }) {
       )}
     </section>
   );
+}
+
+// Build a multi-sheet .xlsx workbook from the currently-loaded revenue report.
+// Amount columns use plain numbers so Excel treats them as numeric values.
+function exportRevenueExcel(report: RevenueReport): void {
+  const { kpis, monthly, byChild, byType, invoiceCount } = report;
+
+  const summary: Record<string, unknown>[] = [
+    { Metric: 'Total invoiced', Value: kpis.totalInvoiced },
+    { Metric: 'Collected', Value: kpis.collected },
+    { Metric: 'Collection rate (%)', Value: kpis.collectionRate },
+    { Metric: 'Outstanding', Value: kpis.outstanding },
+    { Metric: 'Invoice count', Value: invoiceCount },
+  ];
+
+  const monthlyRows = monthly.map((m) => ({
+    Month: formatMonth(m.month),
+    Invoiced: m.invoiced,
+    Collected: m.collected,
+    Outstanding: Math.max(m.invoiced - m.collected, 0),
+  }));
+
+  const byStatusRows = byType.map((r) => ({
+    Status: r.type,
+    Total: r.total,
+    Count: r.count,
+  }));
+
+  const byChildRows = byChild.map((c) => ({
+    Child: c.child_name,
+    Outstanding: c.outstanding,
+  }));
+
+  void exportXlsx('revenue-report.xlsx', [
+    { name: 'Summary', rows: summary },
+    { name: 'Monthly', rows: monthlyRows },
+    { name: 'By status', rows: byStatusRows },
+    { name: 'By child', rows: byChildRows },
+  ]);
 }
 
 // Build a print-to-PDF document from the currently-loaded revenue report.

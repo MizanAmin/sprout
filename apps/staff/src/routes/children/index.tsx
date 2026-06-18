@@ -12,6 +12,7 @@ import {
 import { ChildForm } from '../../features/children/ChildForm';
 import { Modal, Badge, Spinner, EmptyState } from '../../components/ui';
 import { exportCsv, parseCsv } from '../../lib/csv';
+import { exportXlsx } from '../../lib/xlsx';
 
 export const Route = createFileRoute('/children/')({ component: ChildrenPage });
 
@@ -152,6 +153,22 @@ function ChildrenPage() {
     );
   };
 
+  const handleExportExcel = async () => {
+    await exportXlsx('children.xlsx', [
+      {
+        name: 'Children',
+        rows: filtered.map((c) => ({
+          Name: c.name,
+          DOB: c.dob ?? '',
+          Gender: c.gender ?? '',
+          Room: c.room ?? '',
+          Status: c.status ?? '',
+          Allergy: hasAllergy(c.allergy) ? c.allergy : '',
+        })),
+      },
+    ]);
+  };
+
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     // Reset the value so re-selecting the same file fires onChange again.
@@ -201,6 +218,13 @@ function ChildrenPage() {
         <div className="flex items-center gap-2">
           <button className="btn-outline" onClick={handleExport} disabled={filtered.length === 0}>
             Export CSV
+          </button>
+          <button
+            className="btn-outline"
+            onClick={handleExportExcel}
+            disabled={filtered.length === 0}
+          >
+            Export Excel
           </button>
           <button className="btn-outline" onClick={() => fileInputRef.current?.click()}>
             Import CSV
