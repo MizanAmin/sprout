@@ -102,7 +102,7 @@ function RootShell() {
     .sort((a, b) => b.to.length - a.to.length)[0];
 
   return (
-    <div className="flex min-h-screen bg-bg">
+    <div className="flex h-screen overflow-hidden bg-bg">
       <aside className="flex w-60 shrink-0 flex-col bg-sidebar text-white">
         <div className="flex items-center gap-2 px-5 py-5 text-lg font-semibold">🌱 Sprout</div>
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 pb-4">
