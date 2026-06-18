@@ -33,6 +33,21 @@ app.get('/', async (c) => {
   return c.json(rows);
 });
 
+app.get('/all', async (c) => {
+  const { nurseryId } = c.get('user');
+  const { rows } = await withTenant(nurseryId, (client) =>
+    client.query(
+      `SELECT a.*, ch.name AS child_name
+       FROM assessments a
+       JOIN children ch ON ch.id = a.child_id
+       WHERE a.nursery_id = $1
+       ORDER BY ch.name, a.assessed_at DESC`,
+      [nurseryId],
+    ),
+  );
+  return c.json(rows);
+});
+
 app.get('/:id', async (c) => {
   const { nurseryId } = c.get('user');
   const id = c.req.param('id');

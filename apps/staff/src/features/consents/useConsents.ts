@@ -104,6 +104,26 @@ export function useCreateConsentForm() {
   });
 }
 
+// Bulk-send a template to many children in one action. The API skips children
+// that already have a pending form for this template and returns { created }.
+export interface BulkSendInput {
+  templateId: number;
+  childIds: number[];
+  dueDate?: string;
+}
+
+export function useBulkSend() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ templateId, childIds, dueDate }: BulkSendInput) =>
+      api.post<{ created: number }>(`/consents/templates/${templateId}/send`, {
+        childIds,
+        dueDate,
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: consentKeys.all }),
+  });
+}
+
 export function useUpdateConsentFormStatus() {
   const qc = useQueryClient();
   return useMutation({

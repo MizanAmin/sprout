@@ -28,6 +28,9 @@ export interface NurserySettings {
   smtp_user: string;
   smtp_pass: string;
   smtp_from: string;
+  invoice_prefix: string;
+  invoice_footer: string;
+  payment_terms_days: number;
 }
 
 // All fields optional — a PATCH may send any subset.
@@ -55,6 +58,9 @@ export const settingsUpdateSchema = z.object({
   smtpUser: z.string().optional(),
   smtpPass: z.string().optional(),
   smtpFrom: z.string().optional(),
+  invoicePrefix: z.string().optional(),
+  invoiceFooter: z.string().optional(),
+  paymentTermsDays: z.number().optional(),
 });
 
 export type SettingsUpdateInput = z.infer<typeof settingsUpdateSchema>;

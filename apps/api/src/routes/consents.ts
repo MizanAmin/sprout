@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { z } from 'zod';
 import { zValidator } from '@hono/zod-validator';
 import {
   consentTemplateCreateSchema as templateCreateSchema,
@@ -97,6 +98,59 @@ app.delete('/templates/:id', async (c) => {
   );
   if (!rows[0]) return c.json({ error: 'Template not found', code: 'NOT_FOUND' }, 404);
   return c.json({ ok: true });
+});
+
+// Bulk-send a template to many children: one pending consent_form per child.
+// Children are validated against the tenant; children that already have a
+// pending form for this template are skipped (so re-sending is idempotent).
+const bulkSendSchema = z.object({
+  childIds: z.array(z.number().int().positive()).min(1),
+  dueDate: z.string().optional(),
+});
+
+app.post('/templates/:id/send', zValidator('json', bulkSendSchema), async (c) => {
+  const { nurseryId } = c.get('user');
+  const templateId = c.req.param('id');
+  const { childIds, dueDate } = c.req.valid('json');
+
+  const created = await withTenant(nurseryId, async (client) => {
+    // Confirm the template belongs to this nursery before issuing anything.
+    const tpl = await client.query(
+      'SELECT id FROM consent_templates WHERE id=$1 AND nursery_id=$2',
+      [templateId, nurseryId],
+    );
+    if (!tpl.rows[0]) return null;
+
+    // Only children that belong to the tenant are eligible.
+    const eligible = await client.query<{ id: number; name: string }>(
+      'SELECT id, name FROM children WHERE nursery_id=$1 AND id = ANY($2::int[])',
+      [nurseryId, childIds],
+    );
+
+    // Children that already have a pending form for this template are skipped.
+    const existing = await client.query<{ child_id: number }>(
+      `SELECT child_id FROM consent_forms
+       WHERE nursery_id=$1 AND template_id=$2 AND status='pending' AND child_id = ANY($3::int[])`,
+      [nurseryId, templateId, childIds],
+    );
+    const alreadyPending = new Set(existing.rows.map((r) => r.child_id));
+
+    let count = 0;
+    for (const child of eligible.rows) {
+      if (alreadyPending.has(child.id)) continue;
+      await client.query(
+        `INSERT INTO consent_forms
+           (nursery_id, template_id, child_id, child_name, signed_by, signature_data, status, due_date)
+         VALUES ($1,$2,$3,$4,'','','pending',$5)`,
+        [nurseryId, templateId, child.id, child.name, dueDate ?? null],
+      );
+      count++;
+    }
+    return count;
+  });
+
+  if (created === null) return c.json({ error: 'Template not found', code: 'NOT_FOUND' }, 404);
+  return c.json({ created }, 201);
 });
 
 // ---- Forms ----

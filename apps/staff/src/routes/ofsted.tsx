@@ -69,6 +69,60 @@ function printReadinessReport(sections: OfstedSection[]): void {
   printDocument('Ofsted Inspection Readiness', body);
 }
 
+// Standard EYFS SEF judgement areas. Each is matched against readiness sections
+// by keyword so any relevant `detail` is pre-filled into the draft.
+const SEF_AREAS: { heading: string; keywords: string[] }[] = [
+  { heading: 'The effectiveness of leadership and management', keywords: ['leadership', 'management', 'manage', 'governance', 'safeguard'] },
+  { heading: 'The quality of education', keywords: ['education', 'curriculum', 'teaching', 'learning', 'eyfs'] },
+  { heading: 'Behaviour and attitudes', keywords: ['behaviour', 'attitude', 'attendance', 'conduct'] },
+  { heading: 'Personal development', keywords: ['personal', 'development', 'welfare', 'health', 'wellbeing', 'send', 'inclusion'] },
+  { heading: 'Overall effectiveness', keywords: [] },
+];
+
+// Build & print a draft EYFS Self-Evaluation Form (SEF) skeleton. This is a
+// manual draft template — readiness `detail` text is pulled in where the area
+// label matches, with blank prompt lines for the setting to complete.
+function printSefDraft(sections: OfstedSection[]): void {
+  const intro = `<p class="muted">${escapeHtml(
+    'Draft Self-Evaluation Form template for manual completion. Readiness notes are pre-filled where relevant; complete the blank prompts before submission.',
+  )}</p>`;
+
+  const line = '<p>_______________________________________________________________</p>';
+
+  const blocks = SEF_AREAS.map((area) => {
+    const matched =
+      area.keywords.length === 0
+        ? []
+        : sections.filter((s) => {
+            const label = s.label.toLowerCase();
+            return area.keywords.some((kw) => label.includes(kw));
+          });
+
+    const notes = matched
+      .map(
+        (s) =>
+          `<p><strong>${escapeHtml(s.label)}</strong> ` +
+          `<span class="pill ${s.status}">${escapeHtml(STATUS_LABEL[s.status])}</span><br>` +
+          `${escapeHtml(s.detail)}</p>`,
+      )
+      .join('');
+
+    const notesBlock = notes || `<p class="muted">${escapeHtml('No matching readiness notes.')}</p>`;
+
+    return (
+      `<h2>${escapeHtml(area.heading)}</h2>` +
+      notesBlock +
+      `<p><strong>${escapeHtml('Strengths:')}</strong></p>` +
+      line +
+      `<p><strong>${escapeHtml('Areas to develop:')}</strong></p>` +
+      line
+    );
+  }).join('');
+
+  const body = printHeader('Self-Evaluation Form (SEF) — Draft') + intro + blocks;
+  printDocument('Self-Evaluation Form (SEF) — Draft', body);
+}
+
 function ReadinessCard({ section }: { section: OfstedSection }) {
   const accent = STATUS_ACCENT[section.status];
   return (
@@ -119,6 +173,14 @@ function OfstedPage() {
               {counts.green > 0 && <Badge variant="success">{counts.green} good</Badge>}
             </div>
           )}
+          <button
+            type="button"
+            className="btn-outline"
+            disabled={isLoading || total === 0}
+            onClick={() => printSefDraft(sections)}
+          >
+            Draft SEF
+          </button>
           <button
             type="button"
             className="btn-outline"
@@ -204,7 +266,7 @@ function OfstedPage() {
                 </Link>
               ))}
             </div>
-            {/* TODO: needs GET /ofsted/sef to add the reference's draft SEF export. */}
+            {/* Draft SEF export is a manual draft template — see "Draft SEF" button above. */}
           </div>
         </>
       )}

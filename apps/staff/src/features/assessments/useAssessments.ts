@@ -15,6 +15,11 @@ export interface Assessment {
   created_at: string;
 }
 
+// All-children assessment row (per-child row + the joined child name).
+export interface AssessmentWithChild extends Assessment {
+  child_name: string;
+}
+
 export interface AssessmentFilters {
   childId?: number;
 }
@@ -22,6 +27,7 @@ export interface AssessmentFilters {
 export const assessmentKeys = {
   all: ['assessments'] as const,
   list: (f: AssessmentFilters) => [...assessmentKeys.all, 'list', f] as const,
+  allChildren: () => [...assessmentKeys.all, 'all-children'] as const,
 };
 
 function queryString(f: AssessmentFilters): string {
@@ -36,6 +42,13 @@ export function useAssessments(filters: AssessmentFilters = {}) {
     queryKey: assessmentKeys.list(filters),
     queryFn: () => api.get<Assessment[]>(`/assessments${queryString(filters)}`),
     enabled: Boolean(filters.childId),
+  });
+}
+
+export function useAllAssessments() {
+  return useQuery({
+    queryKey: assessmentKeys.allChildren(),
+    queryFn: () => api.get<AssessmentWithChild[]>('/assessments/all'),
   });
 }
 

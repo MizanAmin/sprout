@@ -5,8 +5,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import {
   consentTemplateCreateSchema,
   type ConsentTemplateCreateInput,
-  consentFormCreateSchema,
-  type ConsentFormCreateInput,
 } from '@sprout/schemas';
 import {
   useConsentTemplates,
@@ -14,7 +12,7 @@ import {
   useUpdateConsentTemplate,
   useDeleteConsentTemplate,
   useConsentForms,
-  useCreateConsentForm,
+  useBulkSend,
   useUpdateConsentFormStatus,
   useDeleteConsentForm,
   type ConsentTemplate,
@@ -202,9 +200,9 @@ function ConsentsPage() {
         editing={editing}
         onClose={() => setTemplateModalOpen(false)}
       />
-      <IssueFormModal
+      <BulkSendModal
         open={issueModalOpen}
-        defaultTemplateId={issueTemplateId}
+        templateId={issueTemplateId}
         onClose={() => setIssueModalOpen(false)}
       />
     </div>
@@ -426,96 +424,136 @@ function TemplateForm({
   );
 }
 
-// --- Issue / send form modal ---
+// --- Bulk send modal ---
 
-// Empty string → undefined so optional numeric selects don't become NaN.
-const numberOpt = { setValueAs: (v: unknown) => (v === '' || v == null ? undefined : Number(v)) };
-
-function IssueFormModal({
+// "Send" issues a template to many children at once. The manager picks
+// recipients from the active children (with select-all) plus an optional due
+// date; the API skips children that already have a pending form for this
+// template and returns how many forms were created.
+function BulkSendModal({
   open,
-  defaultTemplateId,
+  templateId,
   onClose,
 }: {
   open: boolean;
-  defaultTemplateId: number | null;
+  templateId: number | null;
   onClose: () => void;
 }) {
   const { data: templates } = useConsentTemplates();
-  const { data: children } = useChildren();
-  const createForm = useCreateConsentForm();
+  const { data: children, isLoading: childrenLoading } = useChildren();
+  const bulkSend = useBulkSend();
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<ConsentFormCreateInput>({
-    resolver: zodResolver(consentFormCreateSchema),
-    // Re-seed defaults when the modal is opened for a specific template.
-    defaultValues: { status: 'pending', templateId: defaultTemplateId ?? undefined },
-  });
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [dueDate, setDueDate] = useState('');
 
-  // The reference "Send" lets a manager pick many children at once; Sprout's
-  // POST /consents creates one form per call, so this issues a single form.
-  // TODO: needs a bulk send endpoint (POST /consents/templates/:id/send) to
-  // issue a form to multiple children in one action.
+  const template = useMemo(
+    () => templates?.find((t) => t.id === templateId) ?? null,
+    [templates, templateId],
+  );
+
+  // Only active children can be sent a form.
+  const activeChildren = useMemo(
+    () => (children ?? []).filter((c) => c.status === 'Active'),
+    [children],
+  );
+
+  const allSelected = activeChildren.length > 0 && selected.size === activeChildren.length;
+
+  const toggleChild = (id: number) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const toggleAll = () =>
+    setSelected(allSelected ? new Set() : new Set(activeChildren.map((c) => c.id)));
+
+  const close = () => {
+    setSelected(new Set());
+    setDueDate('');
+    onClose();
+  };
+
+  const onSend = () => {
+    if (templateId == null || selected.size === 0) return;
+    bulkSend.mutate(
+      { templateId, childIds: [...selected], dueDate: dueDate || undefined },
+      { onSuccess: close },
+    );
+  };
+
   return (
     <Modal
-      // key forces the form to reset its defaults each time a different template
-      // is selected for sending.
-      key={defaultTemplateId ?? 'none'}
+      // Reset selection whenever a different template is chosen for sending.
+      key={templateId ?? 'none'}
       open={open}
-      onClose={onClose}
-      title="Issue consent form"
+      onClose={close}
+      title={template ? `Send "${template.title}"` : 'Send consent form'}
     >
-      <form
-        onSubmit={handleSubmit((data) =>
-          createForm.mutate(data, { onSuccess: onClose }),
-        )}
-        className="space-y-4"
-      >
-        <Field label="Template" error={errors.templateId?.message}>
-          <select
-            {...register('templateId', numberOpt)}
+      <div className="space-y-4">
+        <Field label="Due date">
+          <input
+            type="date"
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
             className="input"
-            defaultValue={defaultTemplateId ?? ''}
-          >
-            <option value="">Select…</option>
-            {templates?.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.title} (v{t.version})
-              </option>
-            ))}
-          </select>
+          />
         </Field>
-        <Field label="Child" error={errors.childId?.message}>
-          <select {...register('childId', numberOpt)} className="input" defaultValue="">
-            <option value="">Select…</option>
-            {children?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Child name (optional override)" error={errors.childName?.message}>
-          <input {...register('childName')} className="input" />
-        </Field>
-        <Field label="Due date" error={errors.dueDate?.message}>
-          <input type="date" {...register('dueDate')} className="input" />
-        </Field>
-        <Field label="Status" error={errors.status?.message}>
-          <select {...register('status')} className="input">
-            <option value="pending">Pending</option>
-            <option value="signed">Signed</option>
-            <option value="declined">Declined</option>
-          </select>
-        </Field>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-gray-700">
+              Recipients ({selected.size} selected)
+            </span>
+            {activeChildren.length > 0 && (
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input type="checkbox" checked={allSelected} onChange={toggleAll} />
+                Select all
+              </label>
+            )}
+          </div>
+
+          {childrenLoading ? (
+            <Spinner />
+          ) : activeChildren.length === 0 ? (
+            <EmptyState title="No active children" description="Add a child to send consent forms." />
+          ) : (
+            <div className="max-h-64 space-y-1 overflow-y-auto rounded-xl border border-border p-2">
+              {activeChildren.map((c) => (
+                <label
+                  key={c.id}
+                  className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-gray-900 hover:bg-gray-50"
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected.has(c.id)}
+                    onChange={() => toggleChild(c.id)}
+                  />
+                  <span className="truncate">{c.name}</span>
+                  {c.room && <span className="ml-auto text-xs text-muted">{c.room}</span>}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {bulkSend.data && (
+          <p className="text-sm text-success">{bulkSend.data.created} form(s) created.</p>
+        )}
+
         <div className="flex justify-end">
-          <button type="submit" className="btn-primary" disabled={createForm.isPending}>
-            {createForm.isPending ? 'Issuing…' : 'Issue form'}
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={onSend}
+            disabled={bulkSend.isPending || selected.size === 0 || templateId == null}
+          >
+            {bulkSend.isPending ? 'Sending…' : `Send to ${selected.size || 0} child(ren)`}
           </button>
         </div>
-      </form>
+      </div>
     </Modal>
   );
 }

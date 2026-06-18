@@ -169,10 +169,8 @@ function PolicyPanel({ policies }: { policies: Policy[] }) {
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium text-gray-900">{p.title}</div>
                   <div className="text-xs text-muted">
-                    v{p.version} · {p.category || 'General'} · Review: {fmtDate(p.next_review)}
-                    {/* TODO: needs signoff counts — GET /compliance/policy-signoffs?policyId=
-                        returns rows but the list endpoint has no aggregate count, and there is
-                        no staff-total endpoint to compute "X/Y signed". */}
+                    v{p.version} · {p.category || 'General'} · Review: {fmtDate(p.next_review)} ·{' '}
+                    {Number(p.signoff_count ?? 0)} sign-offs
                   </div>
                 </div>
                 <Badge variant={REVIEW_VARIANT[status]}>{REVIEW_LABEL[status]}</Badge>
@@ -208,9 +206,8 @@ function RiskAssessmentPanel({ riskAssessments }: { riskAssessments: RiskAssessm
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium text-gray-900">{r.title}</div>
                   <div className="text-xs text-muted">
-                    {r.location || '—'} · Review: {fmtDate(r.next_review)}
-                    {/* TODO: needs item counts — GET /compliance/risk-assessment-items?riskAssessmentId=
-                        returns items but the list endpoint exposes no completed/total aggregate. */}
+                    {r.location || '—'} · Review: {fmtDate(r.next_review)} ·{' '}
+                    {Number(r.item_count ?? 0)} items
                   </div>
                 </div>
                 <Badge variant={REVIEW_VARIANT[status]}>{REVIEW_LABEL[status]}</Badge>

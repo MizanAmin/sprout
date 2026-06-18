@@ -9,10 +9,12 @@ import {
 import { useChildren } from '../features/children/useChildren';
 import {
   useAssessments,
+  useAllAssessments,
   useCreateAssessment,
   useUpdateAssessment,
   useDeleteAssessment,
   type Assessment,
+  type AssessmentWithChild,
 } from '../features/assessments/useAssessments';
 import { Field, Modal, Badge, Spinner, EmptyState } from '../components/ui';
 
@@ -54,13 +56,17 @@ function fmtDate(d: string | null): string {
     : dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+type ViewMode = 'by-child' | 'all';
+
 function AssessmentPage() {
   const { data: children } = useChildren();
+  const [view, setView] = useState<ViewMode>('by-child');
   const [childId, setChildId] = useState<number | undefined>(undefined);
   const [editing, setEditing] = useState<Assessment | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
 
   const { data: assessments, isLoading } = useAssessments({ childId });
+  const { data: allAssessments, isLoading: isLoadingAll } = useAllAssessments();
   const createAssessment = useCreateAssessment();
   const deleteAssessment = useDeleteAssessment();
 
@@ -89,30 +95,57 @@ function AssessmentPage() {
     <div className="space-y-4 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-gray-900">Assessment</h1>
-        <button className="btn-primary" onClick={openAdd} disabled={!childId}>
-          Add assessment
-        </button>
+        {view === 'by-child' && (
+          <button className="btn-primary" onClick={openAdd} disabled={!childId}>
+            Add assessment
+          </button>
+        )}
       </div>
 
-      <div className="flex flex-wrap gap-3">
-        <select
-          className="input max-w-xs"
-          value={childId ?? ''}
-          onChange={(e) => setChildId(e.target.value ? Number(e.target.value) : undefined)}
-        >
-          <option value="">Select a child…</option>
-          {(children ?? []).map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-        {/* TODO: needs a /assessments endpoint that returns child_name (or an
-            all-children view) to show every child's assessments at once like the
-            reference. The current hook is per-child only (enabled when childId set). */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="inline-flex rounded-lg border border-border bg-surface p-0.5">
+          <button
+            type="button"
+            className={`rounded-md px-3 py-1 text-sm font-medium ${
+              view === 'by-child' ? 'bg-primary text-white' : 'text-muted'
+            }`}
+            onClick={() => setView('by-child')}
+          >
+            By child
+          </button>
+          <button
+            type="button"
+            className={`rounded-md px-3 py-1 text-sm font-medium ${
+              view === 'all' ? 'bg-primary text-white' : 'text-muted'
+            }`}
+            onClick={() => setView('all')}
+          >
+            All children
+          </button>
+        </div>
+
+        {view === 'by-child' && (
+          <select
+            className="input max-w-xs"
+            value={childId ?? ''}
+            onChange={(e) => setChildId(e.target.value ? Number(e.target.value) : undefined)}
+          >
+            <option value="">Select a child…</option>
+            {(children ?? []).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
-      {!childId ? (
+      {view === 'all' ? (
+        <AllChildrenView
+          rows={allAssessments ?? []}
+          isLoading={isLoadingAll}
+        />
+      ) : !childId ? (
         <EmptyState
           title="Select a child"
           description="Choose a child to view and record their EYFS development assessments."
@@ -227,6 +260,74 @@ function AssessmentPage() {
           }
         />
       )}
+    </div>
+  );
+}
+
+// All-children view: every assessment for the nursery, grouped/sorted by child.
+// The API already returns rows ordered by child name then assessed_at DESC.
+function AllChildrenView({
+  rows,
+  isLoading,
+}: {
+  rows: AssessmentWithChild[];
+  isLoading: boolean;
+}) {
+  if (isLoading) return <Spinner />;
+  if (rows.length === 0) {
+    return (
+      <EmptyState
+        title="No assessments yet"
+        description="No EYFS assessments have been recorded across the nursery."
+      />
+    );
+  }
+  return (
+    <div className="overflow-hidden rounded-xl border border-border bg-surface">
+      <table className="w-full text-left text-sm">
+        <thead className="bg-gray-50 text-muted">
+          <tr>
+            <th className="px-4 py-2 font-medium">Child</th>
+            <th className="px-4 py-2 font-medium">Area</th>
+            <th className="px-4 py-2 font-medium">Level</th>
+            <th className="px-4 py-2 font-medium">Score</th>
+            <th className="px-4 py-2 font-medium">Date</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {rows.map((a, i) => {
+            const level = levelForScore(a.score);
+            // Only show the child name on the first row of each child group.
+            const firstOfChild = i === 0 || rows[i - 1].child_id !== a.child_id;
+            return (
+              <tr key={a.id} className="hover:bg-gray-50">
+                <td className="px-4 py-2 font-medium text-gray-900">
+                  {firstOfChild ? a.child_name : ''}
+                </td>
+                <td className="px-4 py-2 text-gray-900">{a.area}</td>
+                <td className="px-4 py-2">
+                  <Badge variant={level.variant}>{level.label}</Badge>
+                </td>
+                <td className="px-4 py-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted">{a.score}/5</span>
+                    <div className="h-1.5 w-16 overflow-hidden rounded-full bg-gray-100">
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${(a.score / 5) * 100}%`,
+                          backgroundColor: scoreColor(a.score),
+                        }}
+                      />
+                    </div>
+                  </div>
+                </td>
+                <td className="px-4 py-2 text-muted">{fmtDate(a.assessed_at)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

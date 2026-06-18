@@ -37,9 +37,14 @@ const raUpdateSchema = raCreateSchema.partial();
 app.get('/risk-assessments', async (c) => {
   const { nurseryId } = c.get('user');
   const { rows } = await withTenant(nurseryId, (client) =>
-    client.query('SELECT * FROM risk_assessments WHERE nursery_id=$1 ORDER BY created_at DESC', [
-      nurseryId,
-    ]),
+    client.query(
+      `SELECT ra.*,
+              (SELECT COUNT(*) FROM risk_assessment_items i WHERE i.risk_assessment_id = ra.id) AS item_count
+       FROM risk_assessments ra
+       WHERE ra.nursery_id=$1
+       ORDER BY ra.created_at DESC`,
+      [nurseryId],
+    ),
   );
   return c.json(rows);
 });
@@ -250,7 +255,14 @@ const policyUpdateSchema = policyCreateSchema.partial();
 app.get('/policies', async (c) => {
   const { nurseryId } = c.get('user');
   const { rows } = await withTenant(nurseryId, (client) =>
-    client.query('SELECT * FROM policies WHERE nursery_id=$1 ORDER BY created_at DESC', [nurseryId]),
+    client.query(
+      `SELECT p.*,
+              (SELECT COUNT(*) FROM policy_signoffs s WHERE s.policy_id = p.id) AS signoff_count
+       FROM policies p
+       WHERE p.nursery_id=$1
+       ORDER BY p.created_at DESC`,
+      [nurseryId],
+    ),
   );
   return c.json(rows);
 });

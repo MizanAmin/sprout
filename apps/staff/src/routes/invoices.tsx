@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type FormEvent } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
 import {
   useInvoices,
@@ -7,12 +7,15 @@ import {
   useMarkInvoicePaid,
   useSendInvoiceReminder,
   useDeleteInvoice,
+  useInvoicePayments,
+  useRecordPayment,
+  useChargeDirectDebit,
   type Invoice,
   type InvoiceStatus,
   type InvoiceUpdateInput,
 } from '../features/invoices/useInvoices';
 import { InvoiceModal } from '../features/invoices/InvoiceModal';
-import { StatCard, Badge, Spinner, EmptyState, gbp } from '../components/ui';
+import { StatCard, Badge, Spinner, EmptyState, Modal, gbp } from '../components/ui';
 import { printDocument, printHeader, escapeHtml } from '../lib/print';
 import type { InvoiceCreateInput } from '@sprout/schemas';
 
@@ -109,6 +112,7 @@ function InvoicesPage() {
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Invoice | null>(null);
+  const [payingFor, setPayingFor] = useState<Invoice | null>(null);
 
   const { data: invoices, isLoading } = useInvoices(status ? { status } : {});
   const createInvoice = useCreateInvoice();
@@ -252,6 +256,9 @@ function InvoicesPage() {
                         <button className="text-primary" onClick={() => printInvoice(inv)}>
                           PDF
                         </button>
+                        <button className="text-primary" onClick={() => setPayingFor(inv)}>
+                          Payments
+                        </button>
                         {inv.status !== 'Paid' && inv.status !== 'Cancelled' && (
                           <button
                             className="text-success"
@@ -296,7 +303,174 @@ function InvoicesPage() {
         createSubmitting={createInvoice.isPending}
         onCreate={(data) => createInvoice.mutate(data, { onSuccess: closeModal })}
       />
+
+      {payingFor && (
+        <PaymentsModal invoice={payingFor} onClose={() => setPayingFor(null)} />
+      )}
     </div>
+  );
+}
+
+const PAYMENT_METHODS = ['Cash', 'Card', 'Bank transfer', 'Direct Debit', 'Other'] as const;
+
+// Per-invoice ledger: lists recorded payments and a form to record a new one.
+// A "Charge via Direct Debit" button triggers the GoCardless collect endpoint
+// (POST /payments/gocardless/collect) using the child's active mandate.
+function PaymentsModal({ invoice, onClose }: { invoice: Invoice; onClose: () => void }) {
+  const { data: payments, isLoading } = useInvoicePayments(invoice.id);
+  const recordPayment = useRecordPayment(invoice.id);
+  const chargeDD = useChargeDirectDebit(invoice.id);
+
+  const amount = Number(invoice.amount);
+  const paid = Number(invoice.amount_paid) || 0;
+  const balance = Math.max(0, amount - paid);
+
+  const [form, setForm] = useState({
+    amount: balance > 0 ? String(balance) : '',
+    method: 'Cash',
+    reference: '',
+    notes: '',
+  });
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    const value = Number(form.amount);
+    if (!Number.isFinite(value) || value <= 0) return;
+    recordPayment.mutate(
+      {
+        amount: value,
+        method: form.method,
+        reference: form.reference || undefined,
+        notes: form.notes || undefined,
+      },
+      {
+        onSuccess: () =>
+          setForm({ amount: '', method: form.method, reference: '', notes: '' }),
+      },
+    );
+  };
+
+  return (
+    <Modal open onClose={onClose} title={`Payments — ${invoice.invoice_ref}`}>
+      <div className="space-y-4">
+        <div className="flex gap-4 text-sm">
+          <div>
+            <div className="text-muted">Total</div>
+            <div className="font-semibold text-gray-900">{gbp(amount)}</div>
+          </div>
+          <div>
+            <div className="text-muted">Paid</div>
+            <div className="font-semibold text-gray-900">{gbp(paid)}</div>
+          </div>
+          <div>
+            <div className="text-muted">Balance</div>
+            <div className="font-semibold text-warning">{gbp(balance)}</div>
+          </div>
+        </div>
+
+        {/* Ledger */}
+        <div className="rounded-lg border border-border">
+          {isLoading ? (
+            <div className="p-4">
+              <Spinner />
+            </div>
+          ) : (payments ?? []).length === 0 ? (
+            <div className="p-4 text-sm text-muted">No payments recorded yet.</div>
+          ) : (
+            <table className="w-full text-left text-sm">
+              <thead className="bg-gray-50 text-muted">
+                <tr>
+                  <th className="px-3 py-2 font-medium">Date</th>
+                  <th className="px-3 py-2 font-medium">Amount</th>
+                  <th className="px-3 py-2 font-medium">Method</th>
+                  <th className="px-3 py-2 font-medium">Reference</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {(payments ?? []).map((p) => (
+                  <tr key={p.id}>
+                    <td className="px-3 py-2 text-muted">{fmtDate(p.paid_at)}</td>
+                    <td className="px-3 py-2 font-medium text-gray-900">{gbp(Number(p.amount))}</td>
+                    <td className="px-3 py-2 text-muted">{p.method || '—'}</td>
+                    <td className="px-3 py-2 text-muted">{p.reference || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Record payment */}
+        <form className="space-y-3" onSubmit={submit}>
+          <h3 className="text-sm font-semibold text-gray-900">Record payment</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="text-sm">
+              <span className="mb-1 block text-muted">Amount</span>
+              <input
+                className="input w-full"
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.amount}
+                onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))}
+                required
+              />
+            </label>
+            <label className="text-sm">
+              <span className="mb-1 block text-muted">Method</span>
+              <select
+                className="input w-full"
+                value={form.method}
+                onChange={(e) => setForm((f) => ({ ...f, method: e.target.value }))}
+              >
+                {PAYMENT_METHODS.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <label className="block text-sm">
+            <span className="mb-1 block text-muted">Reference</span>
+            <input
+              className="input w-full"
+              value={form.reference}
+              onChange={(e) => setForm((f) => ({ ...f, reference: e.target.value }))}
+            />
+          </label>
+          <label className="block text-sm">
+            <span className="mb-1 block text-muted">Notes</span>
+            <input
+              className="input w-full"
+              value={form.notes}
+              onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
+            />
+          </label>
+          {recordPayment.isError && (
+            <div className="text-sm text-danger">Could not record payment. Please try again.</div>
+          )}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <button
+              type="button"
+              className="text-primary disabled:opacity-50"
+              disabled={chargeDD.isPending || invoice.status === 'Paid'}
+              onClick={() => chargeDD.mutate()}
+            >
+              {chargeDD.isPending ? 'Charging…' : 'Charge via Direct Debit'}
+            </button>
+            <button type="submit" className="btn-primary" disabled={recordPayment.isPending}>
+              {recordPayment.isPending ? 'Saving…' : 'Record payment'}
+            </button>
+          </div>
+          {chargeDD.isError && (
+            <div className="text-sm text-danger">
+              Direct Debit charge failed (no active mandate or GoCardless error).
+            </div>
+          )}
+        </form>
+      </div>
+    </Modal>
   );
 }
 

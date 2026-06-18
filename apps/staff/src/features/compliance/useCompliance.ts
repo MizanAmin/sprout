@@ -31,6 +31,8 @@ export interface Policy {
   next_review: string | null;
   status: 'draft' | 'active' | 'archived';
   created_at: string;
+  // Aggregate from the list endpoint; pg COUNT may arrive as a string.
+  signoff_count?: number;
 }
 
 export const policyKeys = {
@@ -91,6 +93,8 @@ export interface RiskAssessment {
   next_review: string | null;
   status: 'draft' | 'active' | 'archived';
   created_at: string;
+  // Aggregate from the list endpoint; pg COUNT may arrive as a string.
+  item_count?: number;
 }
 
 export const riskAssessmentKeys = {

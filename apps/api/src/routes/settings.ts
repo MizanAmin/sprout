@@ -37,6 +37,9 @@ const COLS: Record<string, string> = {
   smtpPass: 'smtp_pass',
   smtpFrom: 'smtp_from',
   gocardlessAccessToken: 'gocardless_access_token',
+  invoicePrefix: 'invoice_prefix',
+  invoiceFooter: 'invoice_footer',
+  paymentTermsDays: 'payment_terms_days',
 };
 
 const updateSchema = z.object({
@@ -64,6 +67,9 @@ const updateSchema = z.object({
   smtpPass: z.string().optional(),
   smtpFrom: z.string().optional(),
   gocardlessAccessToken: z.string().optional(),
+  invoicePrefix: z.string().optional(),
+  invoiceFooter: z.string().optional(),
+  paymentTermsDays: z.number().int().optional(),
 });
 
 app.get('/', async (c) => {

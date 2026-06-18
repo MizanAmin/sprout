@@ -150,6 +150,68 @@ app.post('/:id/mark-paid', async (c) => {
   return c.json(rows[0]);
 });
 
+// ---- Per-invoice payment ledger ----
+
+const invoicePaymentSchema = z.object({
+  amount: z.number().positive(),
+  method: z.string().optional(),
+  reference: z.string().optional(),
+  notes: z.string().optional(),
+  paidAt: z.string().optional(),
+});
+
+// Payments recorded against this invoice, newest first.
+app.get('/:id/payments', async (c) => {
+  const { nurseryId } = c.get('user');
+  const id = c.req.param('id');
+  const { rows } = await withTenant(nurseryId, (client) =>
+    client.query(
+      `SELECT * FROM payments
+       WHERE invoice_id=$1 AND nursery_id=$2
+       ORDER BY paid_at DESC`,
+      [id, nurseryId],
+    ),
+  );
+  return c.json(rows);
+});
+
+// Record a payment against this invoice, then recompute amount_paid from the
+// ledger and reconcile status (Paid when fully covered; never override Cancelled).
+app.post('/:id/payments', zValidator('json', invoicePaymentSchema), async (c) => {
+  const { nurseryId } = c.get('user');
+  const id = c.req.param('id');
+  const b = c.req.valid('json');
+  const result = await withTenant(nurseryId, async (client) => {
+    const inv = await client.query('SELECT * FROM invoices WHERE id=$1 AND nursery_id=$2', [
+      id,
+      nurseryId,
+    ]);
+    if (!inv.rows[0]) return null;
+    const childId = inv.rows[0].child_id as number | null;
+    await client.query(
+      `INSERT INTO payments (nursery_id, invoice_id, child_id, amount, method, reference, notes, paid_at)
+       VALUES ($1,$2,$3,$4,COALESCE($5,'manual'),$6,$7,COALESCE($8::timestamptz, NOW()))`,
+      [nurseryId, id, childId, b.amount, b.method ?? null, b.reference ?? '', b.notes ?? '', b.paidAt ?? null],
+    );
+    const upd = await client.query(
+      `UPDATE invoices i
+       SET amount_paid = COALESCE(p.total, 0),
+           status = CASE
+             WHEN i.status='Cancelled' THEN i.status
+             WHEN COALESCE(p.total, 0) >= i.amount THEN 'Paid'
+             ELSE 'Pending'
+           END
+       FROM (SELECT SUM(amount) AS total FROM payments WHERE invoice_id=$1 AND nursery_id=$2) p
+       WHERE i.id=$1 AND i.nursery_id=$2
+       RETURNING i.*`,
+      [id, nurseryId],
+    );
+    return upd.rows[0];
+  });
+  if (!result) return c.json({ error: 'Invoice not found', code: 'NOT_FOUND' }, 404);
+  return c.json(result);
+});
+
 // Stamp a reminder as sent. The actual email send happens via services/email
 // (invoiceReminders job); this endpoint backs the manual "Send Reminder" button.
 app.post('/:id/send-reminder', async (c) => {

@@ -50,6 +50,9 @@ function toFormValues(s: NurserySettings): SettingsUpdateInput {
     smtpUser: s.smtp_user,
     smtpPass: s.smtp_pass,
     smtpFrom: s.smtp_from,
+    invoicePrefix: s.invoice_prefix,
+    invoiceFooter: s.invoice_footer,
+    paymentTermsDays: s.payment_terms_days,
   };
 }
 
@@ -221,11 +224,32 @@ function SettingsForm({ settings }: { settings: NurserySettings }) {
               title="🧾 Invoice customisation"
               subtitle="Choose which nursery details show on printed invoices, and add payment details or a footer message."
             >
-              {/* TODO: needs GET/PUT /settings/invoice-config — not exposed by apps/api/src/routes/settings.ts */}
-              <EmptyState
-                title="Invoice customisation unavailable"
-                description="The API does not expose an invoice-config endpoint yet."
-              />
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <Field label="Invoice prefix" error={errors.invoicePrefix?.message}>
+                  <input {...register('invoicePrefix')} className="input" placeholder="INV-" />
+                </Field>
+                <Field label="Payment terms (days)" error={errors.paymentTermsDays?.message}>
+                  <input
+                    type="number"
+                    min={0}
+                    {...register('paymentTermsDays', numberOpt)}
+                    className="input"
+                    placeholder="14"
+                  />
+                </Field>
+              </div>
+              <Field label="Invoice footer" error={errors.invoiceFooter?.message}>
+                <textarea
+                  {...register('invoiceFooter')}
+                  className="input"
+                  rows={3}
+                  placeholder="Thank you for your business. Bank details, payment instructions, etc."
+                />
+              </Field>
+              <p className="text-xs text-muted">
+                The prefix is prepended to invoice numbers, payment terms set each invoice's due date, and the footer
+                appears at the bottom of every printed invoice.
+              </p>
             </Card>
           </div>
 
@@ -236,14 +260,6 @@ function SettingsForm({ settings }: { settings: NurserySettings }) {
               <EmptyState
                 title="Plan details unavailable"
                 description="Billing/plan data is managed elsewhere (see the billing route)."
-              />
-            </Card>
-
-            <Card title="System preferences">
-              {/* TODO: needs a preferences endpoint — these toggles are not backed by the settings API. */}
-              <EmptyState
-                title="Preferences unavailable"
-                description="Email notification and parent-portal toggles have no API endpoint yet."
               />
             </Card>
 
