@@ -1,4 +1,11 @@
-import { Pool, type PoolClient } from 'pg';
+import { Pool, types, type PoolClient } from 'pg';
+
+// Return DATE columns (OID 1082) as plain 'YYYY-MM-DD' strings instead of JS
+// Date objects. node-pg's default parses them to a local Date, which both
+// serialises to an ugly full timestamp ("...T00:00:00.000Z") and risks
+// off-by-one timezone shifts. Date-only fields (dob, due dates, etc.) should be
+// plain strings end-to-end. TIMESTAMP/TIMESTAMPTZ are left as-is.
+types.setTypeParser(1082, (v) => v);
 
 // pg connection pool + withTenant() — API server ONLY, never imported by apps.
 // Every database-writing or multi-table query runs inside withTenant so RLS is

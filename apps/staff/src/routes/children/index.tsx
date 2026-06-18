@@ -45,6 +45,15 @@ function initials(name: string): string {
     .slice(0, 2);
 }
 
+// Format a 'YYYY-MM-DD' dob for display (e.g. "1 Mar 2022").
+function fmtDob(dob: string | null): string {
+  if (!dob) return '—';
+  const d = new Date(dob);
+  return Number.isNaN(d.getTime())
+    ? dob
+    : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 function hasAllergy(allergy: string): boolean {
   const a = (allergy ?? '').trim();
   return a !== '' && a.toLowerCase() !== 'none';
@@ -304,7 +313,7 @@ function ChildrenPage() {
                           {c.name}
                         </Link>
                         <div className="text-xs text-muted">
-                          {c.dob ?? '—'}
+                          {fmtDob(c.dob)}
                           {c.gender ? ` · ${c.gender}` : ''}
                         </div>
                       </div>
