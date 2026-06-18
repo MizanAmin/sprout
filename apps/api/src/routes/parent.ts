@@ -79,7 +79,7 @@ app.get('/daily-logs', async (c) => {
     (client) =>
       client.query(
         `SELECT * FROM daily_logs
-         WHERE child_id = $1 AND ($2::date IS NULL OR date = $2)
+         WHERE child_id = $1 AND is_shared = true AND ($2::date IS NULL OR date = $2)
          ORDER BY date DESC, time DESC NULLS LAST, id DESC`,
         [childId, date ?? null],
       ),
@@ -104,7 +104,7 @@ app.get('/report-card', async (c) => {
       );
       const logs = await client.query(
         `SELECT * FROM daily_logs
-         WHERE child_id = $1 AND ($2::date IS NULL OR date = $2)
+         WHERE child_id = $1 AND is_shared = true AND ($2::date IS NULL OR date = $2)
          ORDER BY time DESC NULLS LAST, id DESC`,
         [childId, date],
       );

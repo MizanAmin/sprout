@@ -19,6 +19,7 @@ const COLS: Record<string, string> = {
   type: 'type',
   details: 'details',
   addedBy: 'added_by',
+  isShared: 'is_shared',
 };
 
 app.get('/', async (c) => {
@@ -53,10 +54,19 @@ app.post('/', zValidator('json', dailyLogCreateSchema), async (c) => {
   const b = c.req.valid('json');
   const { rows } = await withTenant(nurseryId, (client) =>
     client.query(
-      `INSERT INTO daily_logs (nursery_id, child_id, date, time, type, details, added_by)
-       VALUES ($1,$2,COALESCE($3::date, CURRENT_DATE),$4,$5,$6,$7)
+      `INSERT INTO daily_logs (nursery_id, child_id, date, time, type, details, added_by, is_shared)
+       VALUES ($1,$2,COALESCE($3::date, CURRENT_DATE),$4,$5,$6,$7,COALESCE($8::boolean, true))
        RETURNING *`,
-      [nurseryId, b.childId, b.date ?? null, b.time ?? null, b.type, b.details ?? null, b.addedBy ?? name],
+      [
+        nurseryId,
+        b.childId,
+        b.date ?? null,
+        b.time ?? null,
+        b.type,
+        b.details ?? null,
+        b.addedBy ?? name,
+        b.isShared ?? null,
+      ],
     ),
   );
   return c.json(rows[0], 201);

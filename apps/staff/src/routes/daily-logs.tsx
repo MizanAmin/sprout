@@ -262,12 +262,19 @@ function DailyLogsPage() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between gap-2">
-                      <span
-                        className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize"
-                        style={{ backgroundColor: LOG_BG[log.type], color: LOG_TEXT[log.type] }}
-                      >
-                        {log.type}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium capitalize"
+                          style={{ backgroundColor: LOG_BG[log.type], color: LOG_TEXT[log.type] }}
+                        >
+                          {log.type}
+                        </span>
+                        {!log.is_shared && (
+                          <span className="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-muted">
+                            🔒 Staff only
+                          </span>
+                        )}
+                      </div>
                       <div className="flex shrink-0 items-center gap-2">
                         <span className="text-xs text-muted">{fmtTime(log.time)}</span>
                         <button
@@ -352,8 +359,9 @@ function LogModal({
           time: editing.time ?? undefined,
           type: editing.type,
           details: editing.details ?? undefined,
+          isShared: editing.is_shared,
         }
-      : { childId, date, type: 'note' },
+      : { childId, date, type: 'note', isShared: true },
   });
 
   return (
@@ -390,6 +398,10 @@ function LogModal({
             placeholder="e.g. Slept for 45 mins, ate well, happy mood…"
           />
         </Field>
+        <label className="flex items-center gap-2 text-sm text-gray-700">
+          <input type="checkbox" {...register('isShared')} className="h-4 w-4" />
+          Share this log with parents
+        </label>
         <div className="flex justify-end gap-2">
           <button type="button" className="btn-outline btn-sm" onClick={onClose}>
             Cancel

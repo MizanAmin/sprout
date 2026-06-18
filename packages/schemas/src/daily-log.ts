@@ -8,6 +8,7 @@ export const dailyLogCreateSchema = z.object({
   type: z.enum(['meal', 'sleep', 'nappy', 'mood', 'activity', 'note']),
   details: z.string().optional(),
   addedBy: z.string().optional(),
+  isShared: z.boolean().optional(),
 });
 
 export const dailyLogUpdateSchema = dailyLogCreateSchema.partial();

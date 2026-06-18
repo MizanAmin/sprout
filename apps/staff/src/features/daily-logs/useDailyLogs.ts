@@ -12,6 +12,7 @@ export interface DailyLog {
   type: 'meal' | 'sleep' | 'nappy' | 'mood' | 'activity' | 'note';
   details: string;
   added_by: string;
+  is_shared: boolean;
   created_at: string;
 }
 
