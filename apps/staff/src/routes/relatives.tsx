@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { createFileRoute } from '@tanstack/react-router';
 import type { RelativeCreateInput } from '@sprout/schemas';
 import {
@@ -11,7 +11,7 @@ import {
 import { RelativeForm } from '../features/relatives/RelativeForm';
 import { useChildren, type Child } from '../features/children/useChildren';
 import { Modal, Badge, Spinner, EmptyState } from '../components/ui';
-import { exportCsv } from '../lib/csv';
+import { exportCsv, parseCsv } from '../lib/csv';
 
 export const Route = createFileRoute('/relatives')({
   component: RelativesPage,
@@ -66,6 +66,8 @@ function RelativesPage() {
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<Relative | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [importSummary, setImportSummary] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // child_id → name, for the "Linked child" column.
   const childName = useMemo(() => {
@@ -114,6 +116,69 @@ function RelativesPage() {
     );
   };
 
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Resolve child name → id (case-insensitive) using loaded children.
+    const childByName = new Map<string, number>();
+    for (const c of children ?? []) childByName.set(c.name.trim().toLowerCase(), c.id);
+
+    const rows = parseCsv(await file.text());
+
+    // Match headers case-insensitively to the Export CSV columns.
+    const pick = (row: Record<string, string>, header: string): string => {
+      const key = Object.keys(row).find((k) => k.toLowerCase() === header.toLowerCase());
+      return key ? row[key] : '';
+    };
+
+    const inputs: RelativeCreateInput[] = [];
+    let skipped = 0;
+    for (const row of rows) {
+      const name = pick(row, 'name').trim();
+      if (!name) {
+        skipped++;
+        continue;
+      }
+
+      const childCell = pick(row, 'child').trim();
+      let childId: number | undefined;
+      if (childCell) {
+        const match = childByName.get(childCell.toLowerCase());
+        if (match == null) {
+          // Child column provided but no matching child — skip the row.
+          skipped++;
+          continue;
+        }
+        childId = match;
+      }
+
+      const relation = pick(row, 'relation').trim();
+      const phone = pick(row, 'phone').trim();
+      const email = pick(row, 'email').trim();
+
+      const input: RelativeCreateInput = { name };
+      if (childId != null) input.childId = childId;
+      if (relation) input.relation = relation;
+      if (phone) input.phone = phone;
+      if (email) input.email = email;
+      inputs.push(input);
+    }
+
+    const results = await Promise.allSettled(
+      inputs.map((data) => createRelative.mutateAsync(data)),
+    );
+    const imported = results.filter((r) => r.status === 'fulfilled').length;
+    const failed = results.length - imported;
+
+    setImportSummary(
+      `Imported ${imported} relatives, skipped ${skipped + failed} (no matching child / missing name)`,
+    );
+
+    // Reset the file input so the same file can be re-selected.
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   return (
     <div className="space-y-4 p-6">
       <div className="flex items-center justify-between">
@@ -122,11 +187,27 @@ function RelativesPage() {
           <button className="btn-outline" onClick={handleExport} disabled={filtered.length === 0}>
             Export CSV
           </button>
+          <button className="btn-outline" onClick={() => fileInputRef.current?.click()}>
+            Import CSV
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv"
+            className="hidden"
+            onChange={handleImport}
+          />
           <button className="btn-primary" onClick={openAdd}>
             Add relative
           </button>
         </div>
       </div>
+
+      {importSummary && (
+        <div className="rounded-xl border border-border bg-gray-50 px-4 py-2 text-sm text-gray-900">
+          {importSummary}
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-3">
         <input

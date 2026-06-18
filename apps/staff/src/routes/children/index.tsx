@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import type { ChildCreateInput } from '@sprout/schemas';
 import {
@@ -11,7 +11,7 @@ import {
 } from '../../features/children/useChildren';
 import { ChildForm } from '../../features/children/ChildForm';
 import { Modal, Badge, Spinner, EmptyState } from '../../components/ui';
-import { exportCsv } from '../../lib/csv';
+import { exportCsv, parseCsv } from '../../lib/csv';
 
 export const Route = createFileRoute('/children/')({ component: ChildrenPage });
 
@@ -101,6 +101,8 @@ function ChildrenPage() {
   const [status, setStatus] = useState('');
   const [editing, setEditing] = useState<Child | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [importResult, setImportResult] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const rooms = useMemo(
     () => Array.from(new Set((children ?? []).map((c) => c.room).filter(Boolean))),
@@ -150,6 +152,48 @@ function ChildrenPage() {
     );
   };
 
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // Reset the value so re-selecting the same file fires onChange again.
+    e.target.value = '';
+    if (!file) return;
+
+    const text = await file.text();
+    const rows = parseCsv(text);
+
+    // Match headers case-insensitively to the Export CSV columns.
+    const inputs: ChildCreateInput[] = [];
+    let skipped = 0;
+    for (const row of rows) {
+      const get = (header: string): string => {
+        const key = Object.keys(row).find((k) => k.toLowerCase() === header.toLowerCase());
+        return key ? row[key] : '';
+      };
+      const name = get('Name').trim();
+      if (!name) {
+        skipped++;
+        continue;
+      }
+      const rawStatus = get('Status').trim();
+      const status = rawStatus === 'Inactive' ? 'Inactive' : 'Active';
+      inputs.push({
+        name,
+        dob: get('DOB'),
+        gender: get('Gender'),
+        room: get('Room'),
+        status,
+        allergy: get('Allergy'),
+      });
+    }
+
+    const results = await Promise.allSettled(
+      inputs.map((input) => createChild.mutateAsync(input)),
+    );
+    const imported = results.filter((r) => r.status === 'fulfilled').length;
+    const failed = results.length - imported;
+    setImportResult(`Imported ${imported} children, skipped ${skipped + failed}`);
+  };
+
   return (
     <div className="space-y-4 p-6">
       <div className="flex items-center justify-between">
@@ -158,11 +202,23 @@ function ChildrenPage() {
           <button className="btn-outline" onClick={handleExport} disabled={filtered.length === 0}>
             Export CSV
           </button>
+          <button className="btn-outline" onClick={() => fileInputRef.current?.click()}>
+            Import CSV
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv"
+            className="hidden"
+            onChange={handleImport}
+          />
           <button className="btn-primary" onClick={openAdd}>
             Add child
           </button>
         </div>
       </div>
+
+      {importResult && <div className="text-sm text-muted">{importResult}</div>}
 
       <div className="flex flex-wrap gap-3">
         <input
