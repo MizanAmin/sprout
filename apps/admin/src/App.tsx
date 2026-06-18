@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
+import type { Session } from '@supabase/supabase-js';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, clearKey, getKey, setKey, type ApiError, type Nursery, type Plan } from './api';
+import { supabase } from './supabase';
+import { api, type ApiError, type Nursery, type NurseryUser, type Plan } from './api';
 
 const PLANS: Plan[] = ['seedling', 'blossom', 'grove', 'forest', 'cancelled'];
 
@@ -12,7 +14,6 @@ function fmtDate(s: string | null): string {
     : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-// type="date" value (YYYY-MM-DD) from an ISO timestamp.
 function toDateInput(s: string | null): string {
   if (!s) return '';
   const d = new Date(s);
@@ -20,77 +21,115 @@ function toDateInput(s: string | null): string {
 }
 
 export default function App() {
-  const [unlocked, setUnlocked] = useState(!!getKey());
-  if (!unlocked) return <KeyGate onUnlock={() => setUnlocked(true)} />;
-  return (
-    <Dashboard
-      onLock={() => {
-        clearKey();
-        setUnlocked(false);
-      }}
-    />
-  );
+  const [session, setSession] = useState<Session | null>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setReady(true);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  if (!ready) return <div className="gate muted">Loading…</div>;
+  if (!session) return <LoginGate />;
+  return <Dashboard email={session.user.email ?? ''} />;
 }
 
-// --- Key gate -----------------------------------------------------------------
-function KeyGate({ onUnlock }: { onUnlock: () => void }) {
-  const [val, setVal] = useState('');
+// --- Login (Supabase OTP email code) ------------------------------------------
+function LoginGate() {
+  const [step, setStep] = useState<'email' | 'code'>('email');
+  const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
-  async function submit(e: React.FormEvent) {
+  async function sendCode(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setErr('');
-    setKey(val.trim());
-    try {
-      await api.get('/admin/nurseries');
-      onUnlock();
-    } catch (e) {
-      clearKey();
-      const ae = e as ApiError;
-      setErr(ae.status === 401 ? 'Invalid admin key.' : ae.message || 'Could not reach the API.');
-    } finally {
-      setBusy(false);
-    }
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: { shouldCreateUser: true },
+    });
+    setBusy(false);
+    if (error) setErr(error.message);
+    else setStep('code');
+  }
+
+  async function verify(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setErr('');
+    const { error } = await supabase.auth.verifyOtp({
+      email: email.trim(),
+      token: code.trim(),
+      type: 'email',
+    });
+    setBusy(false);
+    if (error) setErr(error.message);
+    // success → onAuthStateChange sets the session and re-renders.
   }
 
   return (
     <div className="gate">
-      <form className="gate-card" onSubmit={submit}>
+      <form className="gate-card" onSubmit={step === 'email' ? sendCode : verify}>
         <div className="brand">🌱 Sprout — Platform Admin</div>
-        <p className="muted">Enter the admin key to manage tenants.</p>
-        <input
-          type="password"
-          className="input"
-          placeholder="Admin key"
-          value={val}
-          autoFocus
-          onChange={(e) => setVal(e.target.value)}
-        />
-        {err && <div className="error">{err}</div>}
-        <button className="btn-primary" disabled={busy || !val.trim()}>
-          {busy ? 'Checking…' : 'Unlock'}
-        </button>
+        {step === 'email' ? (
+          <>
+            <p className="muted">Sign in with your admin email. We'll send a one-time code.</p>
+            <input
+              type="email"
+              className="input"
+              placeholder="you@example.com"
+              value={email}
+              autoFocus
+              onChange={(e) => setEmail(e.target.value)}
+            />
+            {err && <div className="error">{err}</div>}
+            <button className="btn-primary" disabled={busy || !email.trim()}>
+              {busy ? 'Sending…' : 'Send code'}
+            </button>
+          </>
+        ) : (
+          <>
+            <p className="muted">
+              Enter the 6-digit code sent to <strong>{email}</strong>.
+            </p>
+            <input
+              className="input"
+              placeholder="123456"
+              value={code}
+              autoFocus
+              inputMode="numeric"
+              onChange={(e) => setCode(e.target.value)}
+            />
+            {err && <div className="error">{err}</div>}
+            <button className="btn-primary" disabled={busy || !code.trim()}>
+              {busy ? 'Verifying…' : 'Verify & sign in'}
+            </button>
+            <button type="button" className="btn-ghost" onClick={() => setStep('email')}>
+              Use a different email
+            </button>
+          </>
+        )}
       </form>
     </div>
   );
 }
 
 // --- Dashboard ----------------------------------------------------------------
-function Dashboard({ onLock }: { onLock: () => void }) {
+function Dashboard({ email }: { email: string }) {
   const qc = useQueryClient();
   const { data, isLoading, error } = useQuery({
     queryKey: ['nurseries'],
     queryFn: () => api.get<{ nurseries: Nursery[] }>('/admin/nurseries'),
   });
   const [editing, setEditing] = useState<Nursery | null>(null);
+  const [managing, setManaging] = useState<Nursery | null>(null);
   const [creating, setCreating] = useState(false);
-
-  // A 401 mid-session (rotated/cleared key) → drop back to the gate.
-  useEffect(() => {
-    if ((error as ApiError | null)?.status === 401) onLock();
-  }, [error, onLock]);
 
   const suspend = useMutation({
     mutationFn: (n: Nursery) =>
@@ -100,6 +139,26 @@ function Dashboard({ onLock }: { onLock: () => void }) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['nurseries'] }),
   });
 
+  const signOut = () => supabase.auth.signOut();
+
+  // Not on the allowlist → clear, helpful screen rather than a broken table.
+  if ((error as ApiError | null)?.status === 403) {
+    return (
+      <div className="gate">
+        <div className="gate-card">
+          <div className="brand">Access denied</div>
+          <p className="muted">
+            <strong>{email}</strong> is not on the platform-admin allowlist. Ask for your email to
+            be added to <code>ADMIN_EMAILS</code>.
+          </p>
+          <button className="btn-ghost" onClick={signOut}>
+            Sign out
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const list = data?.nurseries ?? [];
 
   return (
@@ -107,11 +166,12 @@ function Dashboard({ onLock }: { onLock: () => void }) {
       <header className="topbar">
         <div className="brand">🌱 Sprout — Platform Admin</div>
         <div className="row">
+          <span className="muted sm">{email}</span>
           <button className="btn-primary" onClick={() => setCreating(true)}>
             + New nursery
           </button>
-          <button className="btn-ghost" onClick={onLock}>
-            Lock
+          <button className="btn-ghost" onClick={signOut}>
+            Sign out
           </button>
         </div>
       </header>
@@ -150,7 +210,9 @@ function Dashboard({ onLock }: { onLock: () => void }) {
                   <tr key={n.id}>
                     <td className="muted">{n.id}</td>
                     <td>
-                      <div className="strong">{n.name}</div>
+                      <button className="linklike" onClick={() => setManaging(n)}>
+                        {n.name}
+                      </button>
                       <div className="muted sm">{n.email || '—'}</div>
                     </td>
                     <td>
@@ -162,9 +224,16 @@ function Dashboard({ onLock }: { onLock: () => void }) {
                       </span>
                     </td>
                     <td>{fmtDate(n.trial_ends_at)}</td>
-                    <td>{n.user_count}</td>
+                    <td>
+                      <button className="linklike" onClick={() => setManaging(n)}>
+                        {n.user_count}
+                      </button>
+                    </td>
                     <td>{fmtDate(n.created_at)}</td>
                     <td className="right nowrap">
+                      <button className="btn-ghost sm" onClick={() => setManaging(n)}>
+                        Users
+                      </button>
                       <button className="btn-ghost sm" onClick={() => setEditing(n)}>
                         Edit
                       </button>
@@ -185,6 +254,7 @@ function Dashboard({ onLock }: { onLock: () => void }) {
       </main>
 
       {editing && <EditModal nursery={editing} onClose={() => setEditing(null)} />}
+      {managing && <UsersModal nursery={managing} onClose={() => setManaging(null)} />}
       {creating && <CreateModal onClose={() => setCreating(false)} />}
     </div>
   );
@@ -244,12 +314,7 @@ function EditModal({ nursery, onClose }: { nursery: Nursery; onClose: () => void
       </label>
       <label className="field">
         <span>Trial ends</span>
-        <input
-          type="date"
-          className="input"
-          value={trial}
-          onChange={(e) => setTrial(e.target.value)}
-        />
+        <input type="date" className="input" value={trial} onChange={(e) => setTrial(e.target.value)} />
       </label>
       {save.error && <div className="error">{(save.error as ApiError).message}</div>}
       <div className="actions">
@@ -258,6 +323,156 @@ function EditModal({ nursery, onClose }: { nursery: Nursery; onClose: () => void
         </button>
         <button className="btn-primary" disabled={save.isPending} onClick={() => save.mutate()}>
           {save.isPending ? 'Saving…' : 'Save'}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+// --- Users drill-down modal ---------------------------------------------------
+function UsersModal({ nursery, onClose }: { nursery: Nursery; onClose: () => void }) {
+  const qc = useQueryClient();
+  const key = ['nursery-users', nursery.id];
+  const { data, isLoading, error } = useQuery({
+    queryKey: key,
+    queryFn: () => api.get<{ users: NurseryUser[] }>(`/admin/nurseries/${nursery.id}/users`),
+  });
+
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: key });
+    qc.invalidateQueries({ queryKey: ['nurseries'] });
+  };
+
+  const setRole = useMutation({
+    mutationFn: (v: { userId: string; role: 'manager' | 'staff' }) =>
+      api.patch(`/admin/nurseries/${nursery.id}/users/${v.userId}`, { role: v.role }),
+    onSuccess: refresh,
+  });
+  const remove = useMutation({
+    mutationFn: (userId: string) => api.delete(`/admin/nurseries/${nursery.id}/users/${userId}`),
+    onSuccess: refresh,
+  });
+
+  // Invite form
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [role, setInviteRole] = useState<'manager' | 'staff'>('staff');
+  const invite = useMutation({
+    mutationFn: () =>
+      api.post(`/admin/nurseries/${nursery.id}/users`, { name, email, role }),
+    onSuccess: () => {
+      setName('');
+      setEmail('');
+      refresh();
+    },
+  });
+  const inviteValid = name.trim() && /\S+@\S+\.\S+/.test(email);
+
+  const users = data?.users ?? [];
+
+  return (
+    <Modal title={`Users — ${nursery.name}`} onClose={onClose} wide>
+      {isLoading ? (
+        <div className="muted">Loading…</div>
+      ) : error ? (
+        <div className="error">{(error as ApiError).message}</div>
+      ) : (
+        <table className="tbl tight">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {users.length === 0 && (
+              <tr>
+                <td colSpan={4} className="muted">
+                  No users.
+                </td>
+              </tr>
+            )}
+            {users.map((u) => (
+              <tr key={u.id}>
+                <td className="strong">{u.name || '—'}</td>
+                <td className="muted sm">{u.email}</td>
+                <td>
+                  {u.role === 'parent' ? (
+                    <span className="badge plan-seedling">
+                      parent{u.child_count ? ` · ${u.child_count}` : ''}
+                    </span>
+                  ) : (
+                    <select
+                      className="input narrow"
+                      value={u.role}
+                      disabled={setRole.isPending}
+                      onChange={(e) =>
+                        setRole.mutate({ userId: u.id, role: e.target.value as 'manager' | 'staff' })
+                      }
+                    >
+                      <option value="manager">manager</option>
+                      <option value="staff">staff</option>
+                    </select>
+                  )}
+                </td>
+                <td className="right">
+                  <button
+                    className="btn-ghost sm danger"
+                    disabled={remove.isPending}
+                    onClick={() => {
+                      if (confirm(`Remove ${u.email}? This deletes their login.`))
+                        remove.mutate(u.id);
+                    }}
+                  >
+                    Remove
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+
+      <div className="invite">
+        <div className="strong sm">Invite a user</div>
+        <div className="invite-row">
+          <input
+            className="input"
+            placeholder="Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <input
+            className="input"
+            placeholder="Email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <select
+            className="input narrow"
+            value={role}
+            onChange={(e) => setInviteRole(e.target.value as 'manager' | 'staff')}
+          >
+            <option value="staff">staff</option>
+            <option value="manager">manager</option>
+          </select>
+          <button
+            className="btn-primary"
+            disabled={invite.isPending || !inviteValid}
+            onClick={() => invite.mutate()}
+          >
+            {invite.isPending ? 'Inviting…' : 'Invite'}
+          </button>
+        </div>
+        {invite.error && <div className="error">{(invite.error as ApiError).message}</div>}
+      </div>
+
+      <div className="actions">
+        <button className="btn-ghost" onClick={onClose}>
+          Close
         </button>
       </div>
     </Modal>
@@ -343,14 +558,16 @@ function Modal({
   title,
   onClose,
   children,
+  wide,
 }: {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
+  wide?: boolean;
 }) {
   return (
     <div className="overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className={`modal${wide ? ' wide' : ''}`} onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
           <h2>{title}</h2>
           <button className="x" onClick={onClose}>

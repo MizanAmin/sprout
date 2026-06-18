@@ -292,3 +292,50 @@ body {
   gap: 8px;
   margin-top: 6px;
 }
+
+/* Drill-down extras */
+.linklike {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--indigo);
+  cursor: pointer;
+}
+.linklike:hover {
+  text-decoration: underline;
+}
+.modal.wide {
+  width: 640px;
+}
+.tbl.tight th,
+.tbl.tight td {
+  padding: 8px 10px;
+}
+.input.narrow {
+  width: auto;
+  min-width: 110px;
+  padding: 6px 8px;
+}
+.btn-ghost.danger {
+  color: var(--red);
+  border-color: #f3c4c4;
+}
+.btn-ghost.danger:hover {
+  background: var(--red-bg);
+}
+.invite {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.invite-row {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr auto auto;
+  gap: 8px;
+  align-items: center;
+}

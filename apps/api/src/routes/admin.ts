@@ -2,18 +2,20 @@ import { Hono } from 'hono';
 import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { supabaseAdmin, pool } from '../db';
-import { adminAuth } from '../middleware/adminAuth';
+import { requirePlatformAdmin } from '../middleware/requirePlatformAdmin';
 
 // Platform super-admin (cross-tenant) routes. NOT tenant-scoped: these run as the
-// raw pool (no withTenant / RLS) and are guarded ONLY by the X-Admin-Key shared
-// secret (adminAuth), separate from the per-nursery Supabase JWT. Mounted under
-// /api/admin and exempted from requireAuth / requireActiveSubscription in index.ts.
+// raw pool (no withTenant / RLS) and are guarded by a real Supabase login plus the
+// ADMIN_EMAILS allowlist (requirePlatformAdmin), separate from per-nursery role
+// checks. Mounted under /api/admin and exempted from requireAuth /
+// requireActiveSubscription in index.ts.
 const app = new Hono();
 
-// Every admin route requires the shared secret.
-app.use('*', adminAuth);
+// Every admin route requires an allowlisted platform-admin login.
+app.use('*', requirePlatformAdmin);
 
 const PLANS = ['seedling', 'blossom', 'grove', 'forest', 'cancelled'] as const;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // --- GET /nurseries -----------------------------------------------------------
 // List every tenant with a user count, newest first.
@@ -135,6 +137,106 @@ app.post('/nurseries', zValidator('json', createSchema), async (c) => {
   }
 
   return c.json({ nurseryId, userId: data.user.id }, 201);
+});
+
+// === Per-nursery drill-down: user management ================================
+
+// --- GET /nurseries/:id/users -------------------------------------------------
+app.get('/nurseries/:id/users', async (c) => {
+  const id = Number(c.req.param('id'));
+  if (!Number.isInteger(id)) {
+    return c.json({ error: 'Invalid id', code: 'VALIDATION_ERROR' }, 400);
+  }
+  const { rows } = await pool.query(
+    `SELECT u.id, u.name, u.email, u.role, u.created_at,
+            COALESCE(ch.cnt, 0)::int AS child_count
+       FROM users u
+       LEFT JOIN (SELECT user_id, COUNT(*) AS cnt FROM user_children GROUP BY user_id) ch
+         ON ch.user_id = u.id
+      WHERE u.nursery_id=$1
+      ORDER BY CASE u.role WHEN 'manager' THEN 0 WHEN 'staff' THEN 1 ELSE 2 END, u.name`,
+    [id],
+  );
+  return c.json({ users: rows });
+});
+
+// --- POST /nurseries/:id/users — invite a staff/manager -----------------------
+const inviteUserSchema = z.object({
+  name: z.string().min(1),
+  email: z.string().email(),
+  role: z.enum(['manager', 'staff']),
+});
+
+app.post('/nurseries/:id/users', zValidator('json', inviteUserSchema), async (c) => {
+  const id = Number(c.req.param('id'));
+  if (!Number.isInteger(id)) {
+    return c.json({ error: 'Invalid id', code: 'VALIDATION_ERROR' }, 400);
+  }
+  const { rows: nr } = await pool.query<{ plan: string }>(
+    'SELECT plan FROM nurseries WHERE id=$1',
+    [id],
+  );
+  if (!nr.length) return c.json({ error: 'Nursery not found', code: 'NOT_FOUND' }, 404);
+
+  const { name, email, role } = c.req.valid('json');
+  const { data, error } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+    data: { nursery_id: id, role, name, child_ids: [], plan: nr[0].plan },
+    redirectTo: process.env.STAFF_APP_URL ? `${process.env.STAFF_APP_URL}/login` : undefined,
+  });
+  if (error || !data?.user) {
+    return c.json({ error: error?.message ?? 'Invite failed', code: 'INTERNAL_ERROR' }, 500);
+  }
+  try {
+    await pool.query(
+      'INSERT INTO users (id, nursery_id, name, email, role) VALUES ($1,$2,$3,$4,$5)',
+      [data.user.id, id, name, email, role],
+    );
+  } catch {
+    await supabaseAdmin.auth.admin.deleteUser(data.user.id).catch(() => {});
+    return c.json({ error: 'Failed to add user', code: 'INTERNAL_ERROR' }, 500);
+  }
+  return c.json({ userId: data.user.id }, 201);
+});
+
+// --- PATCH /nurseries/:id/users/:userId — change role -------------------------
+const roleSchema = z.object({ role: z.enum(['manager', 'staff']) });
+
+app.patch('/nurseries/:id/users/:userId', zValidator('json', roleSchema), async (c) => {
+  const id = Number(c.req.param('id'));
+  const userId = c.req.param('userId');
+  if (!Number.isInteger(id) || !UUID_RE.test(userId)) {
+    return c.json({ error: 'Invalid id', code: 'VALIDATION_ERROR' }, 400);
+  }
+  const { role } = c.req.valid('json');
+  const { rows } = await pool.query(
+    'UPDATE users SET role=$1 WHERE id=$2 AND nursery_id=$3 RETURNING id, role',
+    [role, userId, id],
+  );
+  if (!rows.length) return c.json({ error: 'User not found', code: 'NOT_FOUND' }, 404);
+  // Mirror into the JWT role claim (takes effect on the user's next session).
+  await supabaseAdmin.auth.admin
+    .updateUserById(userId, { user_metadata: { role } })
+    .catch(() => {});
+  return c.json({ user: rows[0] });
+});
+
+// --- DELETE /nurseries/:id/users/:userId -------------------------------------
+app.delete('/nurseries/:id/users/:userId', async (c) => {
+  const id = Number(c.req.param('id'));
+  const userId = c.req.param('userId');
+  if (!Number.isInteger(id) || !UUID_RE.test(userId)) {
+    return c.json({ error: 'Invalid id', code: 'VALIDATION_ERROR' }, 400);
+  }
+  // Confirm the user belongs to this nursery before deleting.
+  const { rows } = await pool.query('SELECT id FROM users WHERE id=$1 AND nursery_id=$2', [
+    userId,
+    id,
+  ]);
+  if (!rows.length) return c.json({ error: 'User not found', code: 'NOT_FOUND' }, 404);
+  // Deleting the auth user cascades to public.users + user_children (FK ON DELETE CASCADE).
+  const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
+  if (error) return c.json({ error: error.message, code: 'INTERNAL_ERROR' }, 500);
+  return c.json({ ok: true });
 });
 
 export default app;

@@ -6,6 +6,7 @@ import type { AuthUser, HonoEnv } from '../types';
 // (see "Custom claims in user_metadata" — set on sign-up / role change).
 type SupabaseJwtPayload = {
   sub: string;
+  email?: string;
   user_metadata?: {
     nursery_id?: number | string;
     role?: AuthUser['role'];
@@ -27,7 +28,7 @@ function getJwks() {
   return _jwks;
 }
 
-async function verifySupabaseJwt(token: string): Promise<SupabaseJwtPayload> {
+export async function verifySupabaseJwt(token: string): Promise<SupabaseJwtPayload> {
   try {
     const { payload } = await jwtVerify(token, getJwks());
     return payload as SupabaseJwtPayload;
