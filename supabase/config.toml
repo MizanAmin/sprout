@@ -196,7 +196,8 @@ password_requirements = ""
 
 [auth.rate_limit]
 # Number of emails that can be sent per hour. Requires auth.email.smtp to be enabled.
-email_sent = 2
+# Raised from the default 2/hour now that Resend (custom SMTP) is configured below.
+email_sent = 100
 # Number of SMS messages that can be sent per hour. Requires auth.sms to be enabled.
 sms_sent = 30
 # Number of anonymous sign-ins that can be made per hour per IP address. Requires enable_anonymous_sign_ins = true.
@@ -233,15 +234,20 @@ otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
-# Use a production-ready SMTP server
-# [auth.email.smtp]
-# enabled = true
-# host = "smtp.sendgrid.net"
-# port = 587
-# user = "apikey"
-# pass = "env(SENDGRID_API_KEY)"
-# admin_email = "admin@email.com"
-# sender_name = "Admin"
+# Production SMTP via Resend — carries ALL auth emails (magic link, sign-in OTP,
+# password recovery, email change, reauthentication). The sender address must be
+# on a domain verified in Resend. The password is the Resend API key, read from
+# the env so it is never committed. NOTE: this applies to the CLI/local stack and
+# to `supabase config push`; the hosted project must also have these set under
+# Authentication → Emails → SMTP in the dashboard.
+[auth.email.smtp]
+enabled = true
+host = "smtp.resend.com"
+port = 465
+user = "resend"
+pass = "env(RESEND_SMTP_PASSWORD)"
+admin_email = "noreply@sproutnursery.co.uk"
+sender_name = "Sprout"
 
 # Uncomment to customize email template
 # [auth.email.template.invite]
