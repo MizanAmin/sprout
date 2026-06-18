@@ -87,7 +87,24 @@ function RootShell() {
   const [session, setSession] = useState<Session>(null);
   const [ready, setReady] = useState(false);
   const [dark, setDark] = useState(false);
+  // Collapsed nav groups (by title), persisted across reloads. Default: all open.
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
+    try {
+      return new Set(JSON.parse(localStorage.getItem('nav.collapsed') ?? '[]'));
+    } catch {
+      return new Set();
+    }
+  });
   const user = useCurrentUser();
+
+  const toggleGroup = (title: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(title)) next.delete(title);
+      else next.add(title);
+      localStorage.setItem('nav.collapsed', JSON.stringify([...next]));
+      return next;
+    });
 
   useEffect(() => {
     initTheme();
@@ -147,22 +164,36 @@ function RootShell() {
           >
             {DASHBOARD.label}
           </Link>
-          {visibleGroups.map((group) => (
-            <div key={group.title} className="mt-4 space-y-0.5">
-              <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-white/35">
-                {group.title}
-              </div>
-              {group.items.map((item) => (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-white/55 transition hover:bg-sidebar-hover hover:text-white/90 [&.active]:bg-sidebar-active [&.active]:font-semibold [&.active]:text-indigo-300"
+          {visibleGroups.map((group) => {
+            const isCollapsed = collapsed.has(group.title);
+            return (
+              <div key={group.title} className="mt-4 space-y-0.5">
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(group.title)}
+                  aria-expanded={!isCollapsed}
+                  className="flex w-full items-center justify-between rounded-lg px-3 pb-1 pt-1 text-[11px] font-semibold uppercase tracking-wider text-white/35 transition hover:text-white/70"
                 >
-                  {item.label}
-                </Link>
-              ))}
-            </div>
-          ))}
+                  {group.title}
+                  <span
+                    className={`text-[9px] transition-transform ${isCollapsed ? '' : 'rotate-90'}`}
+                  >
+                    ▶
+                  </span>
+                </button>
+                {!isCollapsed &&
+                  group.items.map((item) => (
+                    <Link
+                      key={item.to}
+                      to={item.to}
+                      className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-white/55 transition hover:bg-sidebar-hover hover:text-white/90 [&.active]:bg-sidebar-active [&.active]:font-semibold [&.active]:text-indigo-300"
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+              </div>
+            );
+          })}
         </nav>
       </aside>
 
