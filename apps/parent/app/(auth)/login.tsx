@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, TextInput, Pressable, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TextInput, Pressable, ActivityIndicator, Alert, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { api } from '../../src/api';
 import { cardShadow } from '../../src/theme';
@@ -27,11 +27,12 @@ export default function Login() {
   return (
     <View className="flex-1 justify-center bg-bg px-6">
       <View className="items-center">
-        <View className="h-20 w-20 items-center justify-center rounded-3xl bg-primary-light">
-          <Text className="text-4xl">🌱</Text>
-        </View>
-        <Text className="mt-4 text-3xl font-bold text-gray-900">Sprout</Text>
-        <Text className="mt-1 text-center text-base text-muted">
+        <Image
+          source={require('../../assets/logo.png')}
+          style={{ width: 150, height: 190 }}
+          resizeMode="contain"
+        />
+        <Text className="mt-2 text-center text-base text-muted">
           Sign in to see your child&apos;s day.
         </Text>
       </View>

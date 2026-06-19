@@ -4,6 +4,7 @@
     "slug": "sprout-parent",
     "version": "1.0.0",
     "orientation": "portrait",
+    "userInterfaceStyle": "light",
     "icon": "./assets/icon.png",
     "splash": {
       "image": "./assets/splash.png",
@@ -23,7 +24,7 @@
       "package": "uk.co.sproutnursery.parent",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#1f6f27"
       },
       "permissions": [
         "CAMERA",
@@ -38,8 +39,8 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/icon.png",
-          "color": "#4f8ef7",
+          "icon": "./assets/notification-icon.png",
+          "color": "#1f6f27",
           "sounds": [
             "./assets/notification.wav"
           ]

@@ -3,7 +3,7 @@ import { zValidator } from '@hono/zod-validator';
 import { z } from 'zod';
 import { requireAuth } from '../middleware/auth';
 import { requireRole } from '../middleware/requireRole';
-import { withTenant } from '../db';
+import { withTenant, supabaseAdmin } from '../db';
 import type { HonoEnv } from '../types';
 
 // Parent native-app API. Every route is parent-only and scoped to the parent's
@@ -483,5 +483,17 @@ app.post(
     return c.json(rows[0], 201);
   },
 );
+
+// --- DELETE /account — parent self-service account deletion (App Store 5.1.1) --
+// Removes the parent's login + profile + portal links (user_children) via the
+// auth-user cascade. The child's nursery records are NOT deleted — they belong to
+// the nursery, not the parent. requireAuth has already validated the caller, so we
+// delete via the service-role admin client.
+app.delete('/account', async (c) => {
+  const { id } = c.get('user');
+  const { error } = await supabaseAdmin.auth.admin.deleteUser(id);
+  if (error) return c.json({ error: error.message, code: 'INTERNAL_ERROR' }, 500);
+  return c.json({ ok: true });
+});
 
 export default app;

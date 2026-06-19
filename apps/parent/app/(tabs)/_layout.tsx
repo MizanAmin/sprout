@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../src/api';
 import { useStore, type Child, type Nursery, type AuthUser } from '../../src/store';
@@ -29,6 +29,7 @@ export default function TabsLayout() {
   const nursery = useStore((s) => s.nursery);
   const child = useStore((s) => s.children.find((c) => c.id === s.activeChildId));
   const childCount = useStore((s) => s.children.length);
+  const router = useRouter();
 
   // Load the parent context once and seed the store (children → default active
   // child; nursery + user for screens like Home).
@@ -52,12 +53,20 @@ export default function TabsLayout() {
             <Text className="text-base font-bold text-white">🌱 Sprout</Text>
             <Text className="text-xs text-white/70">{nursery?.name ?? 'Your nursery'}</Text>
           </View>
-          {child && (
-            <View className="flex-row items-center gap-2">
-              <Text className="text-sm font-semibold text-white">{child.name.split(' ')[0]}</Text>
-              <Avatar name={child.name} uri={child.photo_url} size={32} />
-            </View>
-          )}
+          <Pressable
+            onPress={() => router.push('/(tabs)/profile')}
+            className="flex-row items-center gap-2"
+            accessibilityLabel="Profile and settings"
+          >
+            {child ? (
+              <>
+                <Text className="text-sm font-semibold text-white">{child.name.split(' ')[0]}</Text>
+                <Avatar name={child.name} uri={child.photo_url} size={32} />
+              </>
+            ) : (
+              <Text className="text-xl text-white">⚙️</Text>
+            )}
+          </Pressable>
         </View>
         {childCount > 1 && <ChildSwitcher />}
       </SafeAreaView>
@@ -86,6 +95,7 @@ export default function TabsLayout() {
         <Tabs.Screen name="invoices" options={{ href: null }} />
         <Tabs.Screen name="forms" options={{ href: null }} />
         <Tabs.Screen name="bookings" options={{ href: null }} />
+        <Tabs.Screen name="profile" options={{ href: null }} />
       </Tabs>
     </View>
   );

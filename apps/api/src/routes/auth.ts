@@ -119,8 +119,16 @@ app.post('/forgot-password', zValidator('json', forgotSchema), async (c) => {
 // real Supabase session via a server-generated magic link (no email sent there).
 const sendOtpSchema = z.object({ email: z.string().email() });
 
+// Reviewer demo account: App Review can't receive OTP emails, so when DEMO_EMAIL
+// + DEMO_CODE are set in the API env, that one email signs in with the fixed code
+// (no email sent, no DB code stored). The demo user must exist as a parent.
+const demoEmail = () => (process.env.DEMO_EMAIL ?? '').trim().toLowerCase();
+const demoCode = () => (process.env.DEMO_CODE ?? '').trim();
+
 app.post('/send-otp', zValidator('json', sendOtpSchema), async (c) => {
   const email = c.req.valid('json').email.trim().toLowerCase();
+  // Demo account: pretend a code was sent (the fixed DEMO_CODE is used instead).
+  if (demoEmail() && email === demoEmail()) return c.json({ ok: true });
   // Only email a code to an existing account — but never leak which emails exist.
   const { rows } = await pool.query('SELECT 1 FROM users WHERE lower(email)=$1', [email]);
   if (rows.length) {
@@ -153,24 +161,29 @@ app.post('/verify-otp', zValidator('json', verifyOtpSchema), async (c) => {
   const email = c.req.valid('json').email.trim().toLowerCase();
   const code = c.req.valid('json').token.trim();
 
-  const { rows } = await pool.query<{ code_hash: string; expires_at: string; attempts: number }>(
-    'SELECT code_hash, expires_at, attempts FROM login_codes WHERE email=$1',
-    [email],
-  );
-  const row = rows[0];
-  if (!row) return c.json({ error: 'Invalid or expired code', code: 'UNAUTHORIZED' }, 401);
-  if (new Date(row.expires_at) < new Date()) {
+  // Reviewer demo account skips the emailed-code check (see send-otp).
+  const isDemo = demoEmail() !== '' && email === demoEmail() && demoCode() !== '' && code === demoCode();
+
+  if (!isDemo) {
+    const { rows } = await pool.query<{ code_hash: string; expires_at: string; attempts: number }>(
+      'SELECT code_hash, expires_at, attempts FROM login_codes WHERE email=$1',
+      [email],
+    );
+    const row = rows[0];
+    if (!row) return c.json({ error: 'Invalid or expired code', code: 'UNAUTHORIZED' }, 401);
+    if (new Date(row.expires_at) < new Date()) {
+      await pool.query('DELETE FROM login_codes WHERE email=$1', [email]);
+      return c.json({ error: 'Code expired — request a new one', code: 'UNAUTHORIZED' }, 401);
+    }
+    if (row.attempts >= CODE_MAX_ATTEMPTS) {
+      return c.json({ error: 'Too many attempts — request a new code', code: 'UNAUTHORIZED' }, 429);
+    }
+    if (row.code_hash !== hashCode(code)) {
+      await pool.query('UPDATE login_codes SET attempts = attempts + 1 WHERE email=$1', [email]);
+      return c.json({ error: 'Incorrect code', code: 'UNAUTHORIZED' }, 401);
+    }
     await pool.query('DELETE FROM login_codes WHERE email=$1', [email]);
-    return c.json({ error: 'Code expired — request a new one', code: 'UNAUTHORIZED' }, 401);
   }
-  if (row.attempts >= CODE_MAX_ATTEMPTS) {
-    return c.json({ error: 'Too many attempts — request a new code', code: 'UNAUTHORIZED' }, 429);
-  }
-  if (row.code_hash !== hashCode(code)) {
-    await pool.query('UPDATE login_codes SET attempts = attempts + 1 WHERE email=$1', [email]);
-    return c.json({ error: 'Incorrect code', code: 'UNAUTHORIZED' }, 401);
-  }
-  await pool.query('DELETE FROM login_codes WHERE email=$1', [email]);
 
   // Mint a real Supabase session without a password: generate a magic-link token
   // server-side (this does NOT send an email) and immediately verify its hash.
