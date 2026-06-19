@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text, Pressable, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Tabs, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -50,7 +50,14 @@ export default function TabsLayout() {
       <SafeAreaView edges={['top']} style={{ backgroundColor: colors.primary }}>
         <View className="flex-row items-center justify-between px-4 pb-3 pt-1">
           <View>
-            <Text className="text-base font-bold text-white">🌱 Sprout</Text>
+            <View className="flex-row items-center gap-1.5">
+              <Image
+                source={require('../../assets/leaf-white.png')}
+                style={{ width: 18, height: 18 }}
+                resizeMode="contain"
+              />
+              <Text className="text-base font-bold text-white">Sprout</Text>
+            </View>
             <Text className="text-xs text-white/70">{nursery?.name ?? 'Your nursery'}</Text>
           </View>
           <Pressable
