@@ -7,16 +7,18 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { useStore } from '../../src/store';
 import { api } from '../../src/api';
 import { useMessages, useSendMessage, useMarkRead, type Message } from '../../src/features/messages/useMessages';
+import { Avatar, EmptyState, Loading } from '../../src/ui';
+import { colors } from '../../src/theme';
 
 export default function MessagesScreen() {
   const activeChildId = useStore((s) => s.activeChildId);
-  const { data, isLoading } = useMessages(activeChildId);
+  const { data, isLoading, isFetching, refetch } = useMessages(activeChildId);
   const send = useSendMessage(activeChildId);
   const markRead = useMarkRead(activeChildId);
   const [draft, setDraft] = useState('');
@@ -60,30 +62,50 @@ export default function MessagesScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       {isLoading ? (
-        <ActivityIndicator className="mt-8" />
+        <Loading />
       ) : (
         <FlatList
           className="flex-1"
-          contentContainerClassName="p-4 gap-2"
+          contentContainerClassName="p-4 gap-3"
           inverted
           data={messages}
           keyExtractor={(m) => String(m.id)}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={isFetching}
+              onRefresh={refetch}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
           ListEmptyComponent={
-            <Text className="mt-8 text-center text-muted">No messages yet — say hello!</Text>
+            <View className="mt-16">
+              <EmptyState
+                emoji="💬"
+                title="No messages yet"
+                subtitle="Say hello to your nursery team — they'd love to hear from you."
+              />
+            </View>
           }
           renderItem={({ item }: { item: Message }) => {
             const mine = item.from_role === 'parent';
             return (
-              <View className={`max-w-[80%] ${mine ? 'self-end' : 'self-start'}`}>
-                <View
-                  className={`rounded-2xl px-3 py-2 ${mine ? 'bg-success' : 'bg-gray-100'}`}
-                >
-                  <Text className={mine ? 'text-white' : 'text-gray-900'}>{item.body}</Text>
+              <View className={`max-w-[82%] flex-row items-end gap-2 ${mine ? 'self-end flex-row-reverse' : 'self-start'}`}>
+                {!mine && <Avatar name={item.from_name} size={28} />}
+                <View>
+                  <View
+                    className={`rounded-2xl px-4 py-2.5 ${
+                      mine ? 'rounded-br-md bg-primary' : 'rounded-bl-md bg-surface'
+                    }`}
+                  >
+                    <Text className={mine ? 'text-white' : 'text-gray-900'}>{item.body}</Text>
+                  </View>
+                  <Text className={`mt-1 px-1 text-[10px] text-muted ${mine ? 'text-right' : ''}`}>
+                    {!mine && item.from_name ? `${item.from_name} · ` : ''}
+                    {new Date(item.created_at).toLocaleString('en-GB')}
+                  </Text>
                 </View>
-                <Text className={`mt-0.5 text-[10px] text-muted ${mine ? 'text-right' : ''}`}>
-                  {!mine && item.from_name ? `${item.from_name} · ` : ''}
-                  {new Date(item.created_at).toLocaleString('en-GB')}
-                </Text>
               </View>
             );
           }}
@@ -95,15 +117,16 @@ export default function MessagesScreen() {
           value={draft}
           onChangeText={setDraft}
           placeholder="Message the team…"
+          placeholderTextColor={colors.muted}
           multiline
-          className="max-h-24 flex-1 rounded-2xl border border-border bg-bg px-3 py-2 text-gray-900"
+          className="max-h-24 flex-1 rounded-xl border border-border bg-bg px-4 py-3 text-gray-900"
         />
         <Pressable
           onPress={onSend}
           disabled={!draft.trim() || send.isPending}
-          className="rounded-full bg-primary px-4 py-2 disabled:opacity-50"
+          className="rounded-xl bg-primary px-5 py-3 disabled:opacity-50"
         >
-          <Text className="font-medium text-white">Send</Text>
+          <Text className="font-semibold text-white">Send</Text>
         </Pressable>
       </View>
     </KeyboardAvoidingView>

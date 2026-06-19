@@ -6,13 +6,15 @@ import {
   FlatList,
   Modal,
   ScrollView,
-  ActivityIndicator,
+  RefreshControl,
   Alert,
 } from 'react-native';
 import Signature from 'react-native-signature-canvas';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../src/api';
 import { useStore } from '../../src/store';
+import { Card, Pill, EmptyState, Loading } from '../../src/ui';
+import { colors } from '../../src/theme';
 
 interface ConsentForm {
   id: number;
@@ -24,12 +26,20 @@ interface ConsentForm {
   body?: string;
 }
 
+const statusPill = (status: string): { bg: string; fg: string } => {
+  const s = status.toLowerCase();
+  if (s.includes('sign') && !s.includes('un') && !s.includes('await'))
+    return { bg: '#d1fae5', fg: colors.success };
+  if (s.includes('pending') || s.includes('await')) return { bg: '#cffafe', fg: '#0e7490' };
+  return { bg: '#fef3c7', fg: colors.warning };
+};
+
 export default function Forms() {
   const activeChildId = useStore((s) => s.activeChildId);
   const qc = useQueryClient();
   const [active, setActive] = useState<ConsentForm | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['consent-forms', activeChildId],
     queryFn: () => api.get<ConsentForm[]>(`/parent/consent-forms?childId=${activeChildId}`),
     enabled: !!activeChildId,
@@ -55,7 +65,13 @@ export default function Forms() {
     onError: (e: any) => Alert.alert('Could not submit', e?.message ?? 'Try again.'),
   });
 
-  if (isLoading) return <ActivityIndicator className="mt-8" />;
+  if (isLoading) {
+    return (
+      <View className="flex-1 bg-bg">
+        <Loading />
+      </View>
+    );
+  }
 
   return (
     <>
@@ -64,17 +80,41 @@ export default function Forms() {
         contentContainerClassName="p-4 gap-3"
         data={data ?? []}
         keyExtractor={(f) => String(f.id)}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isFetching}
+            onRefresh={refetch}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
         ListEmptyComponent={
-          <View className="rounded-2xl border border-dashed border-border p-8">
-            <Text className="text-center text-muted">No forms need your signature.</Text>
+          <View className="mt-8">
+            <EmptyState
+              emoji="✍️"
+              title="No forms to sign"
+              subtitle="Consent forms from your nursery will appear here when they need your signature."
+            />
           </View>
         }
-        renderItem={({ item }) => (
-          <Pressable onPress={() => setActive(item)} className="rounded-2xl bg-surface p-4">
-            <Text className="font-semibold text-gray-900">{item.title ?? 'Consent form'}</Text>
-            <Text className="mt-1 text-xs text-muted">{item.child_name} · {item.status}</Text>
-          </Pressable>
-        )}
+        renderItem={({ item }) => {
+          const pill = statusPill(item.status);
+          return (
+            <Pressable onPress={() => setActive(item)}>
+              <Card className="flex-row items-center gap-3">
+                <View className="h-11 w-11 items-center justify-center rounded-xl bg-primary-light">
+                  <Text className="text-xl">✍️</Text>
+                </View>
+                <View className="flex-1">
+                  <Text className="font-semibold text-gray-900">{item.title ?? 'Consent form'}</Text>
+                  <Text className="mt-0.5 text-xs text-muted">{item.child_name}</Text>
+                </View>
+                <Pill label={item.status} bg={pill.bg} fg={pill.fg} />
+              </Card>
+            </Pressable>
+          );
+        }}
       />
 
       <Modal visible={!!active} animationType="slide" onRequestClose={() => setActive(null)}>
@@ -83,19 +123,23 @@ export default function Forms() {
             <Text className="text-base font-semibold text-gray-900">
               {active?.title ?? 'Consent form'}
             </Text>
-            <Pressable onPress={() => setActive(null)}>
-              <Text className="text-muted">✕</Text>
+            <Pressable onPress={() => setActive(null)} className="h-8 w-8 items-center justify-center">
+              <Text className="text-lg text-muted">✕</Text>
             </Pressable>
           </View>
 
           <ScrollView className="flex-1" contentContainerClassName="p-4">
-            <Text className="text-sm text-gray-700">
-              {active?.body ?? 'Please review and sign below to provide your consent.'}
-            </Text>
+            <Card>
+              <Text className="text-sm leading-6 text-gray-900">
+                {active?.body ?? 'Please review and sign below to provide your consent.'}
+              </Text>
+            </Card>
           </ScrollView>
 
-          <View className="h-64 border-t border-border">
-            <Text className="px-4 pt-2 text-xs text-muted">Sign below</Text>
+          <View className="h-64 border-t border-border bg-surface">
+            <Text className="px-4 pt-3 text-xs font-bold uppercase tracking-wide text-muted">
+              Sign below
+            </Text>
             {active && (
               <Signature
                 onOK={(sig) => sign.mutate({ id: active.id, signatureData: sig })}

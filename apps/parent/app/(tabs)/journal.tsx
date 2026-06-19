@@ -1,17 +1,11 @@
 import { useState } from 'react';
-import {
-  FlatList,
-  View,
-  Text,
-  Image,
-  Pressable,
-  Modal,
-  ActivityIndicator,
-} from 'react-native';
+import { FlatList, View, Text, Image, Pressable, Modal, RefreshControl } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../src/api';
 import { useStore } from '../../src/store';
-import { fmtDate } from '../../src/date';
+import { relativeDate } from '../../src/date';
+import { Card, Pill, EmptyState, Loading } from '../../src/ui';
+import { colors } from '../../src/theme';
 
 interface Observation {
   id: number;
@@ -26,50 +20,65 @@ export default function Journal() {
   const activeChildId = useStore((s) => s.activeChildId);
   const [photo, setPhoto] = useState<string | null>(null);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['observations', activeChildId],
     queryFn: () => api.get<Observation[]>(`/parent/observations?childId=${activeChildId}`),
     enabled: !!activeChildId,
   });
 
-  if (isLoading) return <ActivityIndicator className="mt-8" />;
+  if (isLoading) {
+    return (
+      <View className="flex-1 bg-bg">
+        <Loading />
+      </View>
+    );
+  }
 
   return (
     <>
       <FlatList
         className="flex-1 bg-bg"
         contentContainerClassName="p-4 gap-4"
+        showsVerticalScrollIndicator={false}
         data={data ?? []}
         keyExtractor={(o) => String(o.id)}
+        refreshControl={
+          <RefreshControl
+            refreshing={isFetching}
+            onRefresh={refetch}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
         ListEmptyComponent={
-          <View className="rounded-2xl border border-dashed border-border p-8">
-            <Text className="text-center text-muted">No shared observations yet.</Text>
-          </View>
+          <EmptyState
+            emoji="📖"
+            title="No journal entries yet"
+            subtitle="Shared observations and photos from your nursery will appear here."
+          />
         }
         renderItem={({ item }) => (
-          <View className="overflow-hidden rounded-2xl bg-surface">
+          <Card className="overflow-hidden p-0">
             {!!item.photo_url && (
               <Pressable onPress={() => setPhoto(item.photo_url)}>
-                <Image source={{ uri: item.photo_url }} className="h-48 w-full" resizeMode="cover" />
+                <Image source={{ uri: item.photo_url }} className="h-52 w-full" resizeMode="cover" />
               </Pressable>
             )}
             <View className="p-4">
               {item.areas?.length > 0 && (
-                <View className="mb-2 flex-row flex-wrap gap-1">
+                <View className="mb-2 flex-row flex-wrap gap-1.5">
                   {item.areas.map((a) => (
-                    <View key={a} className="rounded-full bg-gray-100 px-2 py-0.5">
-                      <Text className="text-xs text-gray-700">{a}</Text>
-                    </View>
+                    <Pill key={a} label={a} bg="#f1f5f9" fg={colors.muted} />
                   ))}
                 </View>
               )}
-              <Text className="text-sm text-gray-900">{item.text}</Text>
+              <Text className="text-sm leading-5 text-gray-900">{item.text}</Text>
               <Text className="mt-2 text-xs text-muted">
-                {fmtDate(item.obs_date)}
+                {relativeDate(item.obs_date)}
                 {item.practitioner ? ` · ${item.practitioner}` : ''}
               </Text>
             </View>
-          </View>
+          </Card>
         )}
       />
 
@@ -78,9 +87,7 @@ export default function Journal() {
           className="flex-1 items-center justify-center bg-black/90"
           onPress={() => setPhoto(null)}
         >
-          {!!photo && (
-            <Image source={{ uri: photo }} className="h-full w-full" resizeMode="contain" />
-          )}
+          {!!photo && <Image source={{ uri: photo }} className="h-full w-full" resizeMode="contain" />}
         </Pressable>
       </Modal>
     </>

@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '@sprout/db/native';
 import { api } from '../../src/api';
+import { cardShadow } from '../../src/theme';
 
 // Step 2: verify the 6-digit code. The API returns a Supabase session, which we
 // install into the native client so it persists in expo-secure-store and the api
@@ -40,35 +41,44 @@ export default function Otp() {
 
   return (
     <View className="flex-1 justify-center bg-bg px-6">
-      <Text className="mb-1 text-2xl font-semibold text-gray-900">Enter your code</Text>
-      <Text className="mb-8 text-base text-muted">
-        We sent a 6-digit code to {email}.
-      </Text>
+      <View className="items-center">
+        <View className="h-20 w-20 items-center justify-center rounded-3xl bg-primary-light">
+          <Text className="text-4xl">✉️</Text>
+        </View>
+        <Text className="mt-4 text-2xl font-bold text-gray-900">Enter your code</Text>
+        <Text className="mt-1 text-center text-base text-muted">
+          We sent a 6-digit code to{'\n'}
+          <Text className="font-semibold text-gray-700">{email}</Text>
+        </Text>
+      </View>
 
-      <TextInput
-        value={code}
-        onChangeText={(t) => setCode(t.replace(/\D/g, '').slice(0, 6))}
-        placeholder="••••••"
-        keyboardType="number-pad"
-        inputMode="numeric"
-        maxLength={6}
-        className="mb-6 rounded-lg border border-border bg-surface px-3 py-3 text-center text-2xl tracking-[0.5em] text-gray-900"
-      />
+      <View className="mt-8 rounded-2xl bg-surface p-5" style={cardShadow}>
+        <TextInput
+          value={code}
+          onChangeText={(t) => setCode(t.replace(/\D/g, '').slice(0, 6))}
+          placeholder="••••••"
+          placeholderTextColor="#cbd5e1"
+          keyboardType="number-pad"
+          inputMode="numeric"
+          maxLength={6}
+          autoFocus
+          className="rounded-xl border border-border bg-bg px-3 py-3.5 text-center text-2xl tracking-[0.5em] text-gray-900"
+        />
+        <Pressable
+          onPress={verify}
+          disabled={loading || code.length < 6}
+          className="mt-4 items-center rounded-xl bg-primary px-4 py-3.5 disabled:opacity-50"
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text className="text-base font-semibold text-white">Verify &amp; sign in</Text>
+          )}
+        </Pressable>
+      </View>
 
-      <Pressable
-        onPress={verify}
-        disabled={loading || code.length < 6}
-        className="items-center rounded-lg bg-primary px-4 py-3 disabled:opacity-50"
-      >
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text className="text-base font-medium text-white">Verify</Text>
-        )}
-      </Pressable>
-
-      <Pressable onPress={() => router.back()} className="mt-4 items-center">
-        <Text className="text-sm text-primary">Use a different email</Text>
+      <Pressable onPress={() => router.back()} className="mt-6 items-center">
+        <Text className="text-sm font-medium text-primary">Use a different email</Text>
       </Pressable>
     </View>
   );

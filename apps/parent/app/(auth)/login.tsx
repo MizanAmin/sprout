@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { View, Text, TextInput, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { api } from '../../src/api';
+import { cardShadow } from '../../src/theme';
 
-// Parent login is OTP-only (no magic links on native — see Supabase Auth Setup).
-// Step 1: collect email and request a 6-digit code, then go to the OTP screen.
+// Parent login is OTP-only: collect email, request a 6-digit code, go to OTP.
 export default function Login() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
@@ -26,32 +26,45 @@ export default function Login() {
 
   return (
     <View className="flex-1 justify-center bg-bg px-6">
-      <Text className="mb-1 text-3xl font-semibold text-gray-900">🌱 Sprout</Text>
-      <Text className="mb-8 text-base text-muted">Sign in to see your child's day.</Text>
+      <View className="items-center">
+        <View className="h-20 w-20 items-center justify-center rounded-3xl bg-primary-light">
+          <Text className="text-4xl">🌱</Text>
+        </View>
+        <Text className="mt-4 text-3xl font-bold text-gray-900">Sprout</Text>
+        <Text className="mt-1 text-center text-base text-muted">
+          Sign in to see your child&apos;s day.
+        </Text>
+      </View>
 
-      <Text className="mb-1 text-sm font-medium text-gray-700">Email</Text>
-      <TextInput
-        value={email}
-        onChangeText={setEmail}
-        placeholder="you@example.com"
-        autoCapitalize="none"
-        autoComplete="email"
-        keyboardType="email-address"
-        inputMode="email"
-        className="mb-6 rounded-lg border border-border bg-surface px-3 py-3 text-base text-gray-900"
-      />
+      <View className="mt-8 rounded-2xl bg-surface p-5" style={cardShadow}>
+        <Text className="mb-1 text-sm font-semibold text-gray-700">Email</Text>
+        <TextInput
+          value={email}
+          onChangeText={setEmail}
+          placeholder="you@example.com"
+          placeholderTextColor="#94a3b8"
+          autoCapitalize="none"
+          autoComplete="email"
+          keyboardType="email-address"
+          inputMode="email"
+          className="rounded-xl border border-border bg-bg px-4 py-3 text-base text-gray-900"
+        />
+        <Pressable
+          onPress={sendCode}
+          disabled={loading || !email.trim()}
+          className="mt-4 items-center rounded-xl bg-primary px-4 py-3.5 disabled:opacity-50"
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text className="text-base font-semibold text-white">Send code</Text>
+          )}
+        </Pressable>
+      </View>
 
-      <Pressable
-        onPress={sendCode}
-        disabled={loading || !email.trim()}
-        className="items-center rounded-lg bg-primary px-4 py-3 disabled:opacity-50"
-      >
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text className="text-base font-medium text-white">Send code</Text>
-        )}
-      </Pressable>
+      <Text className="mt-6 text-center text-xs text-muted">
+        We&apos;ll email you a 6-digit code to sign in securely.
+      </Text>
     </View>
   );
 }

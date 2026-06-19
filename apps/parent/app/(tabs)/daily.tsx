@@ -1,9 +1,11 @@
 import { useState } from 'react';
-import { ScrollView, View, Text, Pressable, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../src/api';
 import { useStore } from '../../src/store';
 import { fmtDate } from '../../src/date';
+import { moodDisplay, logDisplay } from '../../src/humanize';
+import { ScreenScroll, Card, SectionTitle, EmptyState, Loading } from '../../src/ui';
 
 interface Log {
   id: number;
@@ -25,18 +27,12 @@ const shiftDay = (dateStr: string, days: number) => {
   d.setUTCDate(d.getUTCDate() + days);
   return iso(d);
 };
-
-const SECTIONS: { title: string; types: Log['type'][] }[] = [
-  { title: 'Meals', types: ['meal'] },
-  { title: 'Naps', types: ['sleep'] },
-  { title: 'Nappies', types: ['nappy'] },
-  { title: 'Mood', types: ['mood'] },
-  { title: 'Activities & Notes', types: ['activity', 'note'] },
-];
+const fmtTime = (t: string | null) => (t ? t.slice(0, 5) : '');
 
 export default function Daily() {
   const activeChildId = useStore((s) => s.activeChildId);
   const [date, setDate] = useState(iso(new Date()));
+  const isToday = date >= iso(new Date());
 
   const report = useQuery({
     queryKey: ['report-card', activeChildId, date],
@@ -45,51 +41,93 @@ export default function Daily() {
   });
 
   const logs = report.data?.dailyLogs ?? [];
+  const mood = moodDisplay(report.data?.mood);
 
   return (
-    <ScrollView className="flex-1 bg-bg" contentContainerClassName="p-4 gap-4">
-      {/* Date header */}
-      <View className="flex-row items-center justify-between rounded-2xl bg-surface px-4 py-3">
-        <Pressable onPress={() => setDate((d) => shiftDay(d, -1))}>
-          <Text className="text-lg text-primary">‹</Text>
+    <ScreenScroll refreshing={report.isFetching} onRefresh={() => report.refetch()}>
+      {/* Date navigator */}
+      <Card className="flex-row items-center justify-between">
+        <Pressable onPress={() => setDate((d) => shiftDay(d, -1))} className="px-3 py-1">
+          <Text className="text-2xl text-primary">‹</Text>
         </Pressable>
-        <Text className="font-semibold text-gray-900">{fmtDate(date)}</Text>
-        <Pressable onPress={() => setDate((d) => shiftDay(d, 1))} disabled={date >= iso(new Date())}>
-          <Text className={`text-lg ${date >= iso(new Date()) ? 'text-gray-300' : 'text-primary'}`}>›</Text>
-        </Pressable>
-      </View>
-
-      {/* Summary bar */}
-      <View className="flex-row justify-around rounded-2xl bg-surface px-4 py-3">
-        <Text className="text-sm text-gray-700">🍽 {report.data?.mealsCount ?? 0}</Text>
-        <Text className="text-sm text-gray-700">💤 {report.data?.napsCount ?? 0}</Text>
-        <Text className="text-sm text-gray-700">🧷 {report.data?.nappiesCount ?? 0}</Text>
-        <Text className="text-sm text-gray-700">😊 {report.data?.mood ?? '—'}</Text>
-      </View>
-
-      {report.isLoading ? (
-        <ActivityIndicator className="mt-8" />
-      ) : logs.length === 0 ? (
-        <View className="rounded-2xl border border-dashed border-border p-8">
-          <Text className="text-center text-muted">No logs for this day.</Text>
+        <View className="items-center">
+          <Text className="text-base font-semibold text-gray-900">{fmtDate(date)}</Text>
+          {isToday && <Text className="text-xs text-muted">Today</Text>}
         </View>
-      ) : (
-        SECTIONS.map((section) => {
-          const items = logs.filter((l) => section.types.includes(l.type));
-          if (items.length === 0) return null;
-          return (
-            <View key={section.title} className="rounded-2xl bg-surface p-4">
-              <Text className="mb-2 font-semibold text-gray-900">{section.title}</Text>
-              {items.map((l) => (
-                <View key={l.id} className="flex-row justify-between border-t border-border py-2 first:border-t-0">
-                  <Text className="flex-1 text-sm text-gray-700">{l.details || '—'}</Text>
-                  {!!l.time && <Text className="ml-2 text-xs text-muted">{l.time}</Text>}
-                </View>
-              ))}
-            </View>
-          );
-        })
+        <Pressable
+          onPress={() => !isToday && setDate((d) => shiftDay(d, 1))}
+          disabled={isToday}
+          className="px-3 py-1"
+        >
+          <Text className={`text-2xl ${isToday ? 'text-gray-300' : 'text-primary'}`}>›</Text>
+        </Pressable>
+      </Card>
+
+      {/* Mood banner */}
+      {mood && (
+        <Card className="flex-row items-center gap-3" >
+          <View
+            className="h-14 w-14 items-center justify-center rounded-full"
+            style={{ backgroundColor: mood.bg }}
+          >
+            <Text className="text-3xl">{mood.emoji}</Text>
+          </View>
+          <View>
+            <Text className="text-xs font-bold uppercase tracking-wide text-muted">
+              Today&apos;s mood
+            </Text>
+            <Text className="text-lg font-extrabold" style={{ color: mood.fg }}>
+              {mood.label}
+            </Text>
+          </View>
+        </Card>
       )}
-    </ScrollView>
+
+      {/* Summary tiles */}
+      <View className="flex-row gap-2">
+        {[
+          { emoji: '🍽️', val: report.data?.mealsCount ?? 0, label: 'Meals', bg: '#dcfce7', fg: '#166534' },
+          { emoji: '😴', val: report.data?.napsCount ?? 0, label: 'Naps', bg: '#ede9fe', fg: '#4c1d95' },
+          { emoji: '🧷', val: report.data?.nappiesCount ?? 0, label: 'Nappies', bg: '#fef3c7', fg: '#92400e' },
+        ].map((s) => (
+          <View key={s.label} className="flex-1 items-center rounded-2xl py-3" style={{ backgroundColor: s.bg }}>
+            <Text className="text-xl">{s.emoji}</Text>
+            <Text className="text-lg font-extrabold" style={{ color: s.fg }}>{s.val}</Text>
+            <Text className="text-[11px] font-semibold" style={{ color: s.fg }}>{s.label}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Timeline */}
+      <SectionTitle>Timeline</SectionTitle>
+      {report.isLoading ? (
+        <Loading />
+      ) : logs.length === 0 ? (
+        <EmptyState emoji="🗓️" title="No logs for this day" subtitle="Check back later or pick another day." />
+      ) : (
+        <View className="gap-2">
+          {logs.map((l) => {
+            const d = logDisplay(l.type);
+            return (
+              <Card key={l.id} className="flex-row items-start gap-3">
+                <View
+                  className="h-10 w-10 items-center justify-center rounded-xl"
+                  style={{ backgroundColor: d.bg }}
+                >
+                  <Text className="text-lg">{d.emoji}</Text>
+                </View>
+                <View className="flex-1">
+                  <View className="flex-row items-center justify-between">
+                    <Text className="text-sm font-semibold" style={{ color: d.fg }}>{d.label}</Text>
+                    {!!fmtTime(l.time) && <Text className="text-xs text-muted">{fmtTime(l.time)}</Text>}
+                  </View>
+                  {!!l.details && <Text className="mt-0.5 text-sm text-gray-900">{l.details}</Text>}
+                </View>
+              </Card>
+            );
+          })}
+        </View>
+      )}
+    </ScreenScroll>
   );
 }
