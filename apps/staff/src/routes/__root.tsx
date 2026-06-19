@@ -160,7 +160,10 @@ function RootShell() {
   return (
     <div className="flex h-screen overflow-hidden bg-bg">
       <aside className="flex w-60 shrink-0 flex-col bg-sidebar text-white">
-        <div className="flex items-center gap-2 px-5 py-5 text-lg font-semibold">🌱 Sprout</div>
+        <div className="flex items-center gap-2 px-5 py-5">
+          <img src="/sprout-icon.png" alt="" className="h-7 w-7 rounded-lg" />
+          <span className="text-lg font-semibold">Sprout</span>
+        </div>
         <nav className="flex-1 overflow-y-auto px-2 pb-4">
           <Link
             to={DASHBOARD.to}

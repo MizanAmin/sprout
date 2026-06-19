@@ -77,7 +77,10 @@ function LoginGate({ urlError }: { urlError?: string }) {
     return (
       <div className="gate">
         <div className="gate-card">
-          <div className="brand">🌱 Sprout — Platform Admin</div>
+          <div className="brand">
+            <img src="/sprout-icon.png" alt="" width={24} height={24} style={{ borderRadius: 6 }} />
+            Sprout — Platform Admin
+          </div>
           <p className="muted">
             Magic link sent to <strong>{email}</strong>. Open the email on this device and click the
             link to sign in.
@@ -93,7 +96,10 @@ function LoginGate({ urlError }: { urlError?: string }) {
   return (
     <div className="gate">
       <form className="gate-card" onSubmit={send}>
-        <div className="brand">🌱 Sprout — Platform Admin</div>
+        <div className="brand">
+          <img src="/sprout-icon.png" alt="" width={24} height={24} style={{ borderRadius: 6 }} />
+          Sprout — Platform Admin
+        </div>
         <p className="muted">Enter your admin email — we'll send you a magic sign-in link.</p>
         <input
           type="email"
@@ -156,7 +162,10 @@ function Dashboard({ email }: { email: string }) {
   return (
     <div className="page">
       <header className="topbar">
-        <div className="brand">🌱 Sprout — Platform Admin</div>
+        <div className="brand">
+          <img src="/sprout-icon.png" alt="" width={24} height={24} style={{ borderRadius: 6 }} />
+          Sprout — Platform Admin
+        </div>
         <div className="row">
           <span className="muted sm">{email}</span>
           <button className="btn-primary" onClick={() => setCreating(true)}>

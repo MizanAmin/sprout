@@ -34,7 +34,7 @@ function LoginPage() {
         className="w-full max-w-sm space-y-4 rounded-xl border border-border bg-surface p-6 shadow-sm"
       >
         <div className="text-center">
-          <div className="text-2xl font-semibold text-gray-900">🌱 Sprout</div>
+          <img src="/sprout-logo.png" alt="Sprout" className="mx-auto h-11" />
           <p className="mt-1 text-sm text-muted">Sign in to your nursery</p>
         </div>
         <Field label="Email">
