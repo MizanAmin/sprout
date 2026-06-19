@@ -9,6 +9,7 @@ import {
   Alert,
   RefreshControl,
 } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../src/api';
 import { useStore } from '../../src/store';
@@ -287,7 +288,9 @@ function BookingRequestModal({
   const [parentNote, setParentNote] = useState('');
   return (
     <Modal visible={open} animationType="slide" onRequestClose={onClose}>
-      <ScrollView className="flex-1 bg-bg" contentContainerClassName="p-4">
+      <SafeAreaProvider>
+       <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-bg">
+        <ScrollView className="flex-1" contentContainerClassName="p-4">
         <Text className="mb-5 text-xl font-bold text-gray-900">Request a session change</Text>
         <Labeled label="Day">
           <View className="flex-row flex-wrap gap-2">
@@ -338,7 +341,9 @@ function BookingRequestModal({
         <Pressable onPress={onClose} className="mt-3 items-center rounded-xl border border-border bg-surface py-3">
           <Text className="font-semibold text-primary">Cancel</Text>
         </Pressable>
-      </ScrollView>
+        </ScrollView>
+       </SafeAreaView>
+      </SafeAreaProvider>
     </Modal>
   );
 }
@@ -359,7 +364,9 @@ function HolidayRequestModal({
   const [reason, setReason] = useState('');
   return (
     <Modal visible={open} animationType="slide" onRequestClose={onClose}>
-      <ScrollView className="flex-1 bg-bg" contentContainerClassName="p-4">
+      <SafeAreaProvider>
+       <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-bg">
+        <ScrollView className="flex-1" contentContainerClassName="p-4">
         <Text className="mb-5 text-xl font-bold text-gray-900">Request holiday credit</Text>
         <Labeled label="Start date (YYYY-MM-DD)">
           <TextInput
@@ -398,7 +405,9 @@ function HolidayRequestModal({
         <Pressable onPress={onClose} className="mt-3 items-center rounded-xl border border-border bg-surface py-3">
           <Text className="font-semibold text-primary">Cancel</Text>
         </Pressable>
-      </ScrollView>
+        </ScrollView>
+       </SafeAreaView>
+      </SafeAreaProvider>
     </Modal>
   );
 }

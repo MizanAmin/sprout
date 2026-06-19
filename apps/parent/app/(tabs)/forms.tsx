@@ -10,6 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import Signature from 'react-native-signature-canvas';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../src/api';
 import { useStore } from '../../src/store';
@@ -118,39 +119,56 @@ export default function Forms() {
       />
 
       <Modal visible={!!active} animationType="slide" onRequestClose={() => setActive(null)}>
-        <View className="flex-1 bg-bg">
-          <View className="flex-row items-center justify-between border-b border-border bg-surface px-4 py-3">
-            <Text className="text-base font-semibold text-gray-900">
-              {active?.title ?? 'Consent form'}
-            </Text>
-            <Pressable onPress={() => setActive(null)} className="h-8 w-8 items-center justify-center">
-              <Text className="text-lg text-muted">✕</Text>
-            </Pressable>
-          </View>
-
-          <ScrollView className="flex-1" contentContainerClassName="p-4">
-            <Card>
-              <Text className="text-sm leading-6 text-gray-900">
-                {active?.body ?? 'Please review and sign below to provide your consent.'}
+        <SafeAreaProvider>
+          <SafeAreaView edges={['top', 'bottom']} className="flex-1 bg-bg">
+            {/* Header with a visible Back/close control */}
+            <View className="flex-row items-center justify-between border-b border-border bg-surface px-4 py-3">
+              <Pressable
+                onPress={() => setActive(null)}
+                className="flex-row items-center gap-1 py-1 pr-2"
+              >
+                <Text className="text-xl text-primary">‹</Text>
+                <Text className="text-base font-medium text-primary">Back</Text>
+              </Pressable>
+              <Text className="flex-1 text-center text-base font-semibold text-gray-900" numberOfLines={1}>
+                {active?.title ?? 'Consent form'}
               </Text>
-            </Card>
-          </ScrollView>
+              {/* spacer to balance the Back button so the title stays centred */}
+              <View className="w-12" />
+            </View>
 
-          <View className="h-64 border-t border-border bg-surface">
-            <Text className="px-4 pt-3 text-xs font-bold uppercase tracking-wide text-muted">
-              Sign below
-            </Text>
-            {active && (
-              <Signature
-                onOK={(sig) => sign.mutate({ id: active.id, signatureData: sig })}
-                descriptionText=""
-                clearText="Clear"
-                confirmText="Submit"
-                webStyle=".m-signature-pad--footer { margin: 0; }"
-              />
-            )}
-          </View>
-        </View>
+            <ScrollView className="flex-1" contentContainerClassName="p-4">
+              <Card>
+                <Text className="text-sm leading-6 text-gray-900">
+                  {active?.body ?? 'Please review and sign below to provide your consent.'}
+                </Text>
+              </Card>
+            </ScrollView>
+
+            <View className="border-t border-border bg-surface" style={{ height: 300 }}>
+              <View className="flex-row items-center justify-between px-4 pt-3">
+                <Text className="text-xs font-bold uppercase tracking-wide text-muted">
+                  Draw your signature, then tap Submit
+                </Text>
+                <Pressable onPress={() => setActive(null)}>
+                  <Text className="text-sm font-medium text-muted">Cancel</Text>
+                </Pressable>
+              </View>
+              {active && (
+                <Signature
+                  onOK={(sig) => sign.mutate({ id: active.id, signatureData: sig })}
+                  onEmpty={() =>
+                    Alert.alert('Please sign first', 'Draw your signature in the box, then tap Submit.')
+                  }
+                  descriptionText=""
+                  clearText="Clear"
+                  confirmText="Submit"
+                  webStyle=".m-signature-pad--footer { margin: 0; } .m-signature-pad--footer .button { background-color: #4f46e5; color: #fff; }"
+                />
+              )}
+            </View>
+          </SafeAreaView>
+        </SafeAreaProvider>
       </Modal>
     </>
   );
