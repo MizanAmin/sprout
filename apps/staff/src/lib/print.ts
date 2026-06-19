@@ -43,7 +43,7 @@ const PRINT_CSS = `
 export function printHeader(title: string, subtitle?: string): string {
   const date = fmtDate(new Date());
   return `<div class="doc-head">
-    <div><div class="brand">🌱 Sprout</div><h1>${escapeHtml(title)}</h1></div>
+    <div><div class="brand"><img src="/sprout-icon.png" alt="" style="width:18px;height:18px;border-radius:4px;vertical-align:-3px;margin-right:6px">Sprout</div><h1>${escapeHtml(title)}</h1></div>
     <div class="muted" style="text-align:right">${subtitle ? escapeHtml(subtitle) + '<br>' : ''}Generated ${date}</div>
   </div>`;
 }
