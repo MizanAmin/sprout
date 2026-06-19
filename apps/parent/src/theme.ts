@@ -16,11 +16,11 @@ export const colors = {
   ink: '#0f172a',
 };
 
-// Soft shadow shared by cards (iOS shadow + Android elevation).
+// Soft, layered shadow shared by cards (iOS shadow + Android elevation).
 export const cardShadow = {
   shadowColor: colors.ink,
-  shadowOpacity: 0.06,
-  shadowRadius: 10,
-  shadowOffset: { width: 0, height: 3 },
-  elevation: 2,
+  shadowOpacity: 0.08,
+  shadowRadius: 14,
+  shadowOffset: { width: 0, height: 6 },
+  elevation: 3,
 } as const;

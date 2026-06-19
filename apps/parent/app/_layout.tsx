@@ -8,6 +8,10 @@ import { supabase } from '@sprout/db/native';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
+      // Cache between tab switches so navigation feels instant; pull-to-refresh
+      // (on every screen) is the explicit way to force fresh data.
+      staleTime: 60_000,
+      gcTime: 5 * 60_000,
       retry: (failureCount, error: any) => {
         if (
           ['UNAUTHORIZED', 'FORBIDDEN', 'TRIAL_EXPIRED', 'PLAN_UPGRADE_REQUIRED'].includes(

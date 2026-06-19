@@ -196,7 +196,7 @@ export default function Home() {
             key={q.label}
             onPress={() => router.push(q.to)}
             className="flex-1 basis-[47%] items-center rounded-2xl bg-surface py-4"
-            style={{ minWidth: 0 }}
+            style={({ pressed }) => ({ minWidth: 0, opacity: pressed ? 0.7 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] })}
           >
             <Text className="text-2xl">{q.emoji}</Text>
             <Text className="mt-1 text-sm font-semibold text-primary">{q.label}</Text>
