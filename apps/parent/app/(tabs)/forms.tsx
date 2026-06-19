@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   RefreshControl,
   Alert,
 } from 'react-native';
-import Signature from 'react-native-signature-canvas';
+import Signature, { type SignatureViewRef } from 'react-native-signature-canvas';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../src/api';
@@ -39,6 +39,7 @@ export default function Forms() {
   const activeChildId = useStore((s) => s.activeChildId);
   const qc = useQueryClient();
   const [active, setActive] = useState<ConsentForm | null>(null);
+  const sigRef = useRef<SignatureViewRef>(null);
 
   const { data, isLoading, isFetching, refetch } = useQuery({
     queryKey: ['consent-forms', activeChildId],
@@ -146,26 +147,48 @@ export default function Forms() {
             </ScrollView>
 
             <View className="border-t border-border bg-surface" style={{ height: 300 }}>
-              <View className="flex-row items-center justify-between px-4 pt-3">
-                <Text className="text-xs font-bold uppercase tracking-wide text-muted">
-                  Draw your signature, then tap Submit
-                </Text>
-                <Pressable onPress={() => setActive(null)}>
-                  <Text className="text-sm font-medium text-muted">Cancel</Text>
+              <Text className="px-4 pt-3 text-xs font-bold uppercase tracking-wide text-muted">
+                Draw your signature below
+              </Text>
+              <View style={{ flex: 1 }}>
+                {active && (
+                  <Signature
+                    ref={sigRef}
+                    onOK={(sig) => sign.mutate({ id: active.id, signatureData: sig })}
+                    onEmpty={() =>
+                      Alert.alert(
+                        'Please sign first',
+                        'Draw your signature in the box, then tap Submit.',
+                      )
+                    }
+                    descriptionText=""
+                    // Hide the built-in webview footer — we use native buttons below.
+                    webStyle="
+                      .m-signature-pad--footer { display: none; }
+                      .m-signature-pad { box-shadow: none; border: none; }
+                      .m-signature-pad--body { border: none; }
+                      html, body, .m-signature-pad { height: 100%; }
+                    "
+                  />
+                )}
+              </View>
+              <View className="flex-row gap-3 px-4 pb-1 pt-1">
+                <Pressable
+                  onPress={() => sigRef.current?.clearSignature()}
+                  className="flex-1 items-center rounded-xl border border-border bg-surface py-3"
+                >
+                  <Text className="font-semibold text-primary">Clear</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => sigRef.current?.readSignature()}
+                  disabled={sign.isPending}
+                  className="flex-1 items-center rounded-xl bg-primary py-3 disabled:opacity-50"
+                >
+                  <Text className="font-semibold text-white">
+                    {sign.isPending ? 'Submitting…' : 'Submit'}
+                  </Text>
                 </Pressable>
               </View>
-              {active && (
-                <Signature
-                  onOK={(sig) => sign.mutate({ id: active.id, signatureData: sig })}
-                  onEmpty={() =>
-                    Alert.alert('Please sign first', 'Draw your signature in the box, then tap Submit.')
-                  }
-                  descriptionText=""
-                  clearText="Clear"
-                  confirmText="Submit"
-                  webStyle=".m-signature-pad--footer { margin: 0; } .m-signature-pad--footer .button { background-color: #4f46e5; color: #fff; }"
-                />
-              )}
             </View>
           </SafeAreaView>
         </SafeAreaProvider>
