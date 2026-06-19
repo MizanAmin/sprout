@@ -4,4 +4,14 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   server: { port: 5174 },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom'],
+          'data-vendor': ['@tanstack/react-query', '@supabase/supabase-js'],
+        },
+      },
+    },
+  },
 });
